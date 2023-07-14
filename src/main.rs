@@ -30,7 +30,7 @@ pub async fn main() {
     let config = Config::load(args.config_file).unwrap();
 
     // Create the NAT64 instance
-    let nat64 = Nat64::new(
+    let mut nat64 = Nat64::new(
         config.interface.address_v4,
         config.interface.address_v6,
         config.interface.pool,
@@ -45,5 +45,6 @@ pub async fn main() {
     .await
     .unwrap();
 
-    loop{}
+    // Handle packets
+    nat64.run().await.unwrap();
 }

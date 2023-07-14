@@ -82,4 +82,36 @@ impl Nat64 {
 
         Ok(Self { interface })
     }
+
+
+    /// Block and run the NAT instance. This will handle all packets
+    pub async fn run(&mut self) -> Result<(), std::io::Error> {
+        // Read the interface MTU
+        let mtu: u16 =
+            std::fs::read_to_string(format!("/sys/class/net/{}/mtu", self.interface.name()))
+                .expect("Failed to read interface MTU").strip_suffix("\n").unwrap()
+                .parse().unwrap();
+
+        // Allocate a buffer for incoming packets
+        // NOTE: Add 4 to account for the Tun header
+        let mut buffer = vec![0; (mtu as usize) + 4];
+
+        loop {
+            // Read incoming packet
+            let len = self.interface.recv(&mut buffer)?;
+
+            // Process the packet
+            let response = self.process(&buffer[..len]).await?;
+
+            // If there is a response, send it
+            if let Some(response) = response {
+                self.interface.send(&response)?;
+            }
+        }
+    }
+
+    async fn process(&mut self, packet: &[u8]) -> Result<Option<Vec<u8>>, std::io::Error> {
+        log::debug!("Processing packet: {:?}", packet);
+        Ok(None)
+    }
 }

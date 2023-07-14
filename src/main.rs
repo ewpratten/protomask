@@ -1,8 +1,11 @@
 use clap::Parser;
 use config::Config;
+use nat::Nat64;
 
-mod config;
 mod cli;
+mod config;
+mod nat;
+mod types;
 
 #[tokio::main]
 pub async fn main() {
@@ -26,5 +29,21 @@ pub async fn main() {
     // Parse the config file
     let config = Config::load(args.config_file).unwrap();
 
+    // Create the NAT64 instance
+    let nat64 = Nat64::new(
+        config.interface.address_v4,
+        config.interface.address_v6,
+        config.interface.pool,
+        config.interface.prefix,
+        config
+            .rules
+            .static_map
+            .iter()
+            .map(|rule| (rule.v4, rule.v6))
+            .collect(),
+    )
+    .await
+    .unwrap();
 
+    loop{}
 }

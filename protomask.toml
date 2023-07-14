@@ -1,22 +1,14 @@
 # Example configuration file for protomask
+[Interface]
+# Addresses to use for ICMP messaging
+Address4 = "192.0.2.1"
+Address6 = "2001:db8:1::1"
+# A list of IPv4 prefixes to NAT to
+Pool = ["192.0.2.0/24"]
+# The IPv6 prefix to listen for traffic on
+Prefix = "64:ff9b::/96"
 
-# Options for configuring the NAT64 interface
-[interface]
-# A list of IPv4 prefixes to use as the NAT64 pool
-# The first address of the pool will be assigned to protomask itself (for ICMP messaging)
-pool = ["192.0.2.0/24"]
-
-# The IPv6 prefix to use for the NAT64 interface.
-prefix = "64:ff9b::/96"
-
-# A unique IPv6 address to use for ICMP messaging
-# This will also serve DNS64
-icmpv6_address = "2001:db8:1::1"
-
-# Rules for controlling address mapping
-[rules]
-# A static mapping of IPv4 and IPv6 addresses 
+[Rules]
+# A static mapping of IPv4 and IPv6 addresses
 # These addresses will be exclusively reserved, and not used in the general pool
-static_map = [
-    { v4 = "192.0.2.2", v6 = "2001:db8:1::2" }
-]
+MapStatic = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]

@@ -1,4 +1,5 @@
 use clap::Parser;
+use colored::Colorize;
 use config::Config;
 use nat::Nat64;
 
@@ -14,7 +15,19 @@ pub async fn main() {
 
     // Set up logging
     fern::Dispatch::new()
-        .format(|out, message, record| out.finish(format_args!("{}: {}", record.level(), message)))
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}: {}",
+                match record.level() {
+                    log::Level::Error => "ERROR".red().bold().to_string(),
+                    log::Level::Warn => "WARN".yellow().bold().to_string(),
+                    log::Level::Info => "INFO".green().bold().to_string(),
+                    log::Level::Debug => "DEBUG".bright_blue().bold().to_string(),
+                    log::Level::Trace => "TRACE".bright_white().bold().to_string(),
+                },
+                message
+            ))
+        })
         .level(match args.verbose {
             true => log::LevelFilter::Debug,
             false => log::LevelFilter::Info,

@@ -2,22 +2,24 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use bimap::BiMap;
 use colored::Colorize;
-use ipnet::{Ipv4Net, Ipv6Net};
+use ipnet::{IpAdd, Ipv4Net, Ipv6Net};
 use tokio::process::Command;
 use tun_tap::{Iface, Mode};
 
 use crate::nat::{
-    packet::{make_ipv4_packet, make_ipv6_packet},
-    utils::{bytes_to_hex_str, bytes_to_ipv4_addr, bytes_to_ipv6_addr, ipv4_to_ipv6},
+    packet::{xlat_v6_to_v4, IpPacket},
+    utils::bytes_to_hex_str,
 };
+
+use self::packet::xlat_v4_to_v6;
 
 mod packet;
 mod utils;
 
-/// A cleaner way to execute an `ip` command
-macro_rules! iproute2 {
-    ($($arg:expr),*) => {{
-        Command::new("ip")
+/// A cleaner way to execute a CLI command
+macro_rules! command {
+    ($cmd:expr, $($arg:expr),*) => {{
+        Command::new($cmd)
             $(.arg($arg))*
             .status()
     }}
@@ -54,51 +56,40 @@ impl Nat64 {
         static_mappings: Vec<(Ipv4Addr, Ipv6Addr)>,
     ) -> Result<Self, std::io::Error> {
         // Bring up tun interface
-        let interface = Iface::new("nat64i%d", Mode::Tun)?;
+        let interface = Iface::without_packet_info("nat64i%d", Mode::Tun)?;
 
         // Configure the interface
         let interface_name = interface.name();
         log::info!("Configuring interface {}", interface_name);
 
-        // Add the nat addresses
-        log::debug!("Assigning {} to {}", nat_v4, interface_name);
-        iproute2!(
-            "address",
-            "add",
-            format!("{}/32", nat_v4),
-            "dev",
-            interface_name
-        )
-        .await?;
-        log::debug!("Assigning {} to {}", nat_v6, interface_name);
-        iproute2!(
-            "address",
-            "add",
-            format!("{}/128", nat_v6),
-            "dev",
-            interface_name
-        )
-        .await?;
+        #[cfg_attr(rustfmt, rustfmt_skip)]
+        {
+            // Add the nat addresses
+            log::debug!("Assigning {} to {}", nat_v4, interface_name);
+            command!("ip", "address", "add", format!("{}/32", nat_v4), "dev", interface_name).await?;
+            log::debug!("Assigning {} to {}", nat_v6, interface_name);
+            command!("ip", "address", "add", format!("{}/128", nat_v6), "dev", interface_name ).await?;
 
-        // Bring up the interface
-        log::debug!("Bringing up {}", interface_name);
-        iproute2!("link", "set", "dev", interface_name, "up").await?;
+            // Bring up the interface
+            log::debug!("Bringing up {}", interface_name);
+            command!("ip", "link", "set", "dev", interface_name, "up").await?;
 
-        // Add route for IPv6 prefix
-        log::debug!("Adding route {} via {}", ipv6_prefix, interface_name);
-        iproute2!(
-            "route",
-            "add",
-            ipv6_prefix.to_string(),
-            "dev",
-            interface_name
-        )
-        .await?;
+            // Add route for IPv6 prefix
+            log::debug!("Adding route {} via {}", ipv6_prefix, interface_name);
+            command!("ip", "route", "add", ipv6_prefix.to_string(), "dev", interface_name).await?;
+
+            // Configure iptables
+            log::debug!("Configuring iptables");
+            command!("iptables", "-A", "FORWARD", "-i", interface_name, "-j", "ACCEPT").await?;
+            command!("iptables", "-A", "FORWARD", "-o", interface_name, "-j", "ACCEPT").await?;
+            command!("ip6tables", "-A", "FORWARD", "-i", interface_name, "-j", "ACCEPT").await?;
+            command!("ip6tables", "-A", "FORWARD", "-o", interface_name, "-j", "ACCEPT").await?;
+        }
 
         // Add every IPv4 prefix to the routing table
         for prefix in ipv4_pool.iter() {
             log::debug!("Adding route {} via {}", prefix, interface_name);
-            iproute2!("route", "add", prefix.to_string(), "dev", interface_name).await?;
+            command!("ip", "route", "add", prefix.to_string(), "dev", interface_name).await?;
         }
 
         // Build a reservation list
@@ -130,8 +121,7 @@ impl Nat64 {
                 .unwrap();
 
         // Allocate a buffer for incoming packets
-        // NOTE: Add 4 to account for the Tun header
-        let mut buffer = vec![0; (mtu as usize) + 4];
+        let mut buffer = vec![0; mtu as usize];
 
         log::info!("Translating packets");
         loop {
@@ -149,21 +139,21 @@ impl Nat64 {
     }
 
     /// Internal function that checks if a destination address is allowed to be processed
-    // fn is_dest_allowed(&self, dest: IpAddr) -> bool {
-    //     return dest == self.instance_v4
-    //         || dest == self.instance_v6
-    //         || match dest {
-    //             IpAddr::V4(addr) => self.ipv4_pool.iter().any(|prefix| prefix.contains(&addr)),
-    //             IpAddr::V6(addr) => self.ipv6_prefix.contains(&addr),
-    //         };
-    // }
+    fn is_dest_allowed(&self, dest: IpAddr) -> bool {
+        return dest == self.instance_v4
+            || dest == self.instance_v6
+            || match dest {
+                IpAddr::V4(addr) => self.ipv4_pool.iter().any(|prefix| prefix.contains(&addr)),
+                IpAddr::V6(addr) => self.ipv6_prefix.contains(&addr),
+            };
+    }
 
     /// Calculate a unique IPv4 address inside the pool for a given IPv6 address
     fn calculate_ipv4(&self, _addr: Ipv6Addr) -> Option<Ipv4Addr> {
         // Search the list of possible IPv4 addresses
         for prefix in self.ipv4_pool.iter() {
             for addr in prefix.hosts() {
-                // If this address is avalible, use it
+                // If this address is available, use it
                 if !self.pool_reservations.contains_left(&addr) {
                     return Some(addr);
                 }
@@ -173,127 +163,143 @@ impl Nat64 {
         None
     }
 
+    /// Embeds an IPv4 address into an IPv6 address
+    fn embed_v4_into_v6(&self, addr: Ipv4Addr) -> Ipv6Addr {
+        let mut octets = [0u8; 16];
+        octets[..12].copy_from_slice(&self.ipv6_prefix.network().octets()[..12]);
+        octets[12..].copy_from_slice(&addr.octets());
+        Ipv6Addr::from(octets)
+    }
+
+    /// Extracts an IPv4 address from an IPv6 address
+    fn extract_v4_from_v6(&self, addr: Ipv6Addr) -> Ipv4Addr {
+        let mut octets = [0u8; 4];
+        octets.copy_from_slice(&addr.octets()[12..]);
+        Ipv4Addr::from(octets)
+    }
+
+    /// Gets or creates a reservation for a given address
+    fn get_or_create_reservation(&mut self, addr: IpAddr) -> Option<IpAddr> {
+        match addr {
+            IpAddr::V4(addr) => {
+                if self.pool_reservations.contains_left(&addr) {
+                    return Some(IpAddr::V6(
+                        *self.pool_reservations.get_by_left(&addr).unwrap(),
+                    ));
+                } else {
+                    return None;
+                }
+            }
+            IpAddr::V6(addr) => {
+                // If the address is already reserved, return it
+                if self.pool_reservations.contains_right(&addr) {
+                    return Some(IpAddr::V4(
+                        *self.pool_reservations.get_by_right(&addr).unwrap(),
+                    ));
+                }
+
+                // Otherwise, calculate a new address
+                let new_addr = self.calculate_ipv4(addr)?;
+                self.pool_reservations.insert(new_addr, addr);
+                return Some(IpAddr::V4(new_addr));
+            }
+        }
+    }
+
     /// Internal function to process an incoming packet.
     /// If `Some` is returned, the result is sent back out the interface
     async fn process(&mut self, packet: &[u8]) -> Result<Option<Vec<u8>>, std::io::Error> {
-        // Ignore the first 4 bytes, which are the Tun header
-        let tun_header = &packet[..4];
-        let packet = &packet[4..];
+        // Parse the packet
+        let input_packet = IpPacket::new(&packet);
+        if let None = input_packet {
+            log::warn!(
+                "{}",
+                format!(
+                    "Malformed packet received: version: {}, len: {}",
+                    packet[0] >> 4,
+                    packet.len()
+                )
+                .yellow()
+            );
+            return Ok(None);
+        }
+        let input_packet = input_packet.unwrap();
 
-        // Log the packet
-        log::debug!("Processing packet with length: {}", packet.len());
-        log::debug!(
-            "> Tun Header: {}",
-            bytes_to_hex_str(tun_header).bright_cyan()
-        );
-        log::debug!("> IP Header: {}", bytes_to_hex_str(packet).bright_cyan());
+        // Log some info about the packet
+        #[cfg_attr(rustfmt, rustfmt_skip)]
+        {
+            log::debug!("Processing packet with length: {}", input_packet.len().to_string().bright_cyan());
+            log::debug!("> IP Header: {}", bytes_to_hex_str(input_packet.get_header()).bright_cyan());
+            log::debug!("> Source: {}", input_packet.get_source().to_string().bright_cyan());
+            log::debug!("> Destination: {}", input_packet.get_destination().to_string().bright_cyan());
+        }
 
-        match packet[0] >> 4 {
-            4 => {
-                // Parse the source and destination addresses
-                let source_addr = bytes_to_ipv4_addr(&packet[12..16]);
-                let dest_addr = bytes_to_ipv4_addr(&packet[16..20]);
-                log::debug!("> Source: {}", source_addr.to_string().bright_cyan());
-                log::debug!("> Destination: {}", dest_addr.to_string().bright_cyan());
+        // Ignore packets that aren't destined for the NAT instance
+        if !self.is_dest_allowed(input_packet.get_destination()) {
+            log::debug!("{}", "Ignoring packet. Invalid destination".yellow());
+            return Ok(None);
+        }
 
-                // Only accept packets destined to hosts in the reservation list
-                // TODO: Should also probably let the nat addr pass
-                if !self.pool_reservations.contains_left(&dest_addr) {
-                    log::debug!("{}", "Ignoring packet. Invalid destination".yellow());
+        // Handle packet translation
+        let output_packet = match input_packet {
+            IpPacket::V4(packet) => {
+                let new_source = self.embed_v4_into_v6(packet.get_source());
+                let new_dest =
+                    self.get_or_create_reservation(std::net::IpAddr::V4(packet.get_destination()));
+                if let Some(IpAddr::V6(new_dest)) = new_dest {
+                    // Log the new addresses
+                    #[cfg_attr(rustfmt, rustfmt_skip)]
+                    {
+                        log::debug!("> Mapped IPv6 Source: {}", new_source.to_string().bright_cyan());
+                        log::debug!("> Mapped IPv6 Destination: {}", new_dest.to_string().bright_cyan());
+                    }
+
+                    // Translate the packet
+                    let data = xlat_v4_to_v6(&packet, new_source, new_dest);
+
+                    // Log the translated packet header
+                    log::debug!(
+                        "> Translated Header: {}",
+                        bytes_to_hex_str(&data[0..40]).bright_cyan()
+                    );
+
+                    // Return the translated packet
+                    data
+                } else {
                     return Ok(None);
                 }
-
-                // Get the IPv6 source and destination addresses
-                let source_addr_v6 = ipv4_to_ipv6(&source_addr, &self.ipv6_prefix);
-                let dest_addr_v6 = self.pool_reservations.get_by_left(&dest_addr).unwrap();
-                log::debug!(
-                    "> Mapped IPv6 Source: {}",
-                    source_addr_v6.to_string().bright_cyan()
-                );
-                log::debug!(
-                    "> Mapped IPv6 Destination: {}",
-                    dest_addr_v6.to_string().bright_cyan()
-                );
-
-                // Build an IPv6 packet using this information and the original packet's payload
-                let translated = make_ipv6_packet(
-                    packet[8],
-                    match packet[9] {
-                        1 => 58,
-                        _ => packet[9],
-                    },
-                    &source_addr_v6,
-                    &dest_addr_v6,
-                    &packet[20..],
-                );
-                let mut response = vec![0; 4 + translated.len()];
-                response[..4].copy_from_slice(tun_header);
-                response[4..].copy_from_slice(&translated);
-                log::debug!(
-                    "> Translated Header: {}",
-                    bytes_to_hex_str(&response[4..40]).bright_cyan()
-                );
-                log::debug!("{}", "Sending translated packet".bright_green());
-                return Ok(Some(response));
             }
-            6 => {
-                // Parse the source and destination addresses
-                let source_addr = bytes_to_ipv6_addr(&packet[8..24]);
-                let dest_addr = bytes_to_ipv6_addr(&packet[24..40]);
-                log::debug!("> Source: {}", source_addr.to_string().bright_cyan());
-                log::debug!("> Destination: {}", dest_addr.to_string().bright_cyan());
+            IpPacket::V6(packet) => {
+                let new_source =
+                    self.get_or_create_reservation(std::net::IpAddr::V6(packet.get_source()));
+                let new_dest = self.extract_v4_from_v6(packet.get_destination());
+                if let Some(IpAddr::V4(new_source)) = new_source {
+                    // Log the new addresses
+                    #[cfg_attr(rustfmt, rustfmt_skip)]
+                    {
+                        log::debug!("> Mapped IPv4 Source: {}", new_source.to_string().bright_cyan());
+                        log::debug!("> Mapped IPv4 Destination: {}", new_dest.to_string().bright_cyan());
+                    }
 
-                // Only process packets destined for the NAT prefix
-                if !self.ipv6_prefix.contains(&dest_addr) {
-                    log::debug!("{}", "Ignoring packet. Invalid destination".yellow());
+                    // Translate the packet
+                    let data = xlat_v6_to_v4(&packet, new_source, new_dest);
+
+                    // Log the translated packet header
+                    log::debug!(
+                        "> Translated Header: {}",
+                        bytes_to_hex_str(&data[0..20]).bright_cyan()
+                    );
+
+                    // Return the translated packet
+                    data
+                } else {
                     return Ok(None);
                 }
-
-                // If the source address doesn't have a reservation, calculate its corresponding IPv4 address and insert into the map
-                if !self.pool_reservations.contains_right(&source_addr) {
-                    let source_addr_v4 = self.calculate_ipv4(source_addr).unwrap();
-                    self.pool_reservations.insert(source_addr_v4, source_addr);
-                }
-
-                // Get the mapped source address
-                let source_addr_v4 = self.pool_reservations.get_by_right(&source_addr).unwrap();
-                log::debug!(
-                    "> Mapped IPv4 Source: {}",
-                    source_addr_v4.to_string().bright_cyan()
-                );
-
-                // Convert the destination address to IPv4
-                let dest_addr_v4 = Ipv4Addr::new(packet[36], packet[37], packet[38], packet[39]);
-                log::debug!(
-                    "> Mapped IPv4 Destination: {}",
-                    dest_addr_v4.to_string().bright_cyan()
-                );
-
-                // Build an IPv4 packet using this information and the original packet's payload
-                let translated = make_ipv4_packet(
-                    packet[7],
-                    match packet[6] {
-                        58 => 1,
-                        _ => packet[6],
-                    },
-                    source_addr_v4,
-                    &dest_addr_v4,
-                    &packet[40..],
-                );
-                let mut response = vec![0; 4 + translated.len()];
-                response[..4].copy_from_slice(tun_header);
-                response[4..].copy_from_slice(&translated);
-                log::debug!(
-                    "> Translated Header: {}",
-                    bytes_to_hex_str(&response[4..24]).bright_cyan()
-                );
-                log::debug!("{}", "Sending translated packet".bright_green());
-                return Ok(Some(response));
-            }
-            _ => {
-                log::warn!("Unknown IP version: {}", packet[0] >> 4);
-                return Ok(None);
             }
         };
+
+        // Build the response
+        log::debug!("{}", "Sending translated packet".bright_green());
+        return Ok(Some(output_packet));
     }
 }

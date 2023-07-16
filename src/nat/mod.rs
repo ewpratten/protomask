@@ -2,19 +2,22 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use bimap::BiMap;
 use colored::Colorize;
-use ipnet::{IpAdd, Ipv4Net, Ipv6Net};
+use ipnet::{Ipv4Net, Ipv6Net};
+use pnet_packet::{
+    icmpv6::Icmpv6Packet,
+    ip::IpNextHeaderProtocols,
+    ipv6::{Ipv6Packet, MutableIpv6Packet},
+    Packet, ipv4::{Ipv4Packet, MutableIpv4Packet}, icmp::IcmpPacket,
+};
 use tokio::process::Command;
 use tun_tap::{Iface, Mode};
 
-use crate::nat::{
-    packet::{xlat_v6_to_v4, IpPacket},
-    utils::bytes_to_hex_str,
-};
+use crate::nat::packet::{xlat_v6_to_v4, IpPacket};
 
 use self::packet::xlat_v4_to_v6;
 
+mod icmp;
 mod packet;
-mod utils;
 
 /// A cleaner way to execute a CLI command
 macro_rules! command {
@@ -25,8 +28,17 @@ macro_rules! command {
     }}
 }
 
+/// Converts bytes to a hex string for debugging
+fn bytes_to_hex_str(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|val| format!("{:02x}", val))
+        .collect::<Vec<String>>()
+        .join(" ")
+}
+
 pub struct Nat64 {
-    /// Handle for the TUN interface
+    /// Handle for the Tun interface
     interface: Iface,
     /// Instance IPv4 address
     instance_v4: Ipv4Addr,
@@ -89,7 +101,15 @@ impl Nat64 {
         // Add every IPv4 prefix to the routing table
         for prefix in ipv4_pool.iter() {
             log::debug!("Adding route {} via {}", prefix, interface_name);
-            command!("ip", "route", "add", prefix.to_string(), "dev", interface_name).await?;
+            command!(
+                "ip",
+                "route",
+                "add",
+                prefix.to_string(),
+                "dev",
+                interface_name
+            )
+            .await?;
         }
 
         // Build a reservation list
@@ -232,11 +252,18 @@ impl Nat64 {
             log::debug!("> IP Header: {}", bytes_to_hex_str(input_packet.get_header()).bright_cyan());
             log::debug!("> Source: {}", input_packet.get_source().to_string().bright_cyan());
             log::debug!("> Destination: {}", input_packet.get_destination().to_string().bright_cyan());
+            log::debug!("> Next Header: {}", input_packet.get_next_header().to_string().bright_cyan());
         }
 
         // Ignore packets that aren't destined for the NAT instance
         if !self.is_dest_allowed(input_packet.get_destination()) {
             log::debug!("{}", "Ignoring packet. Invalid destination".yellow());
+            return Ok(None);
+        }
+
+        // Drop packets with 0 TTL
+        if input_packet.get_ttl() == 0 {
+            log::debug!("{}", "Ignoring packet. TTL is 0".yellow());
             return Ok(None);
         }
 
@@ -254,17 +281,42 @@ impl Nat64 {
                         log::debug!("> Mapped IPv6 Destination: {}", new_dest.to_string().bright_cyan());
                     }
 
-                    // Translate the packet
-                    let data = xlat_v4_to_v6(&packet, new_source, new_dest);
+                    // Handle inner packet conversion for protocols that don't support both v4 and v6
+                    if let Some(packet) = Ipv4Packet::owned(match packet.get_next_level_protocol() {
+                        // ICMP must be translated to ICMPv6
+                        IpNextHeaderProtocols::Icmp => {
+                            if let Some(new_payload) =
+                                icmp::icmp_to_icmpv6(&IcmpPacket::new(packet.payload()).unwrap())
+                            {
+                                // Mutate the input packet
+                                let mut packet =
+                                    MutableIpv4Packet::owned(packet.packet().to_vec()).unwrap();
+                                packet.set_next_level_protocol(IpNextHeaderProtocols::Icmpv6);
+                                packet.set_payload(&new_payload.packet().to_vec());
+                                packet.packet().to_vec()
+                            } else {
+                                return Ok(None);
+                            }
+                        }
 
-                    // Log the translated packet header
-                    log::debug!(
-                        "> Translated Header: {}",
-                        bytes_to_hex_str(&data[0..40]).bright_cyan()
-                    );
+                        // By default, packets can be directly fed to the next function
+                        _ => packet.packet().to_vec(),
+                    }) {
+                        // Translate the packet
+                        let translated = xlat_v4_to_v6(&packet, new_source, new_dest, true);
 
-                    // Return the translated packet
-                    data
+                        // Log the translated packet header
+                        log::debug!(
+                            "> Translated Header: {}",
+                            bytes_to_hex_str(&translated[0..40]).bright_cyan()
+                        );
+
+                        // Return the translated packet
+                        translated
+                    } else {
+                        return Ok(None);
+                    }
+
                 } else {
                     return Ok(None);
                 }
@@ -281,17 +333,41 @@ impl Nat64 {
                         log::debug!("> Mapped IPv4 Destination: {}", new_dest.to_string().bright_cyan());
                     }
 
-                    // Translate the packet
-                    let data = xlat_v6_to_v4(&packet, new_source, new_dest);
+                    // Handle inner packet conversion for protocols that don't support both v4 and v6
+                    if let Some(packet) = Ipv6Packet::owned(match packet.get_next_header() {
+                        // ICMPv6 must be translated to ICMP
+                        IpNextHeaderProtocols::Icmpv6 => {
+                            if let Some(new_payload) =
+                                icmp::icmpv6_to_icmp(&Icmpv6Packet::new(packet.payload()).unwrap())
+                            {
+                                // Mutate the input packet
+                                let mut packet =
+                                    MutableIpv6Packet::owned(packet.packet().to_vec()).unwrap();
+                                packet.set_next_header(IpNextHeaderProtocols::Icmp);
+                                packet.set_payload(&new_payload.packet().to_vec());
+                                packet.packet().to_vec()
+                            } else {
+                                return Ok(None);
+                            }
+                        }
 
-                    // Log the translated packet header
-                    log::debug!(
-                        "> Translated Header: {}",
-                        bytes_to_hex_str(&data[0..20]).bright_cyan()
-                    );
+                        // By default, packets can be directly fed to the next function
+                        _ => packet.packet().to_vec(),
+                    }) {
+                        // Translate the packet
+                        let translated = xlat_v6_to_v4(&packet, new_source, new_dest, true);
 
-                    // Return the translated packet
-                    data
+                        // Log the translated packet header
+                        log::debug!(
+                            "> Translated Header: {}",
+                            bytes_to_hex_str(&translated[0..20]).bright_cyan()
+                        );
+
+                        // Return the translated packet
+                        translated
+                    } else {
+                        return Ok(None);
+                    }
                 } else {
                     return Ok(None);
                 }

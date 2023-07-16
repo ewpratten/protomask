@@ -1,8 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-// // use etherparse::{IpHeader, Ipv4Header, Ipv4Extensions};
 use pnet_packet::{
-    ethernet::EtherTypes::Ipv6,
+    ip::IpNextHeaderProtocol,
     ipv4::{checksum, Ipv4, Ipv4Packet, MutableIpv4Packet},
     ipv6::{Ipv6, Ipv6Packet, MutableIpv6Packet},
     Packet,
@@ -74,12 +73,29 @@ impl IpPacket<'_> {
             IpPacket::V6(packet) => packet.packet().len(),
         }
     }
+
+    /// Get the next header
+    pub fn get_next_header(&self) -> IpNextHeaderProtocol {
+        match self {
+            IpPacket::V4(packet) => packet.get_next_level_protocol(),
+            IpPacket::V6(packet) => packet.get_next_header(),
+        }
+    }
+
+    /// Get the TTL
+    pub fn get_ttl(&self) -> u8 {
+        match self {
+            IpPacket::V4(packet) => packet.get_ttl(),
+            IpPacket::V6(packet) => packet.get_hop_limit(),
+        }
+    }
 }
 
 pub fn xlat_v6_to_v4(
     ipv6_packet: &Ipv6Packet,
     new_source: Ipv4Addr,
     new_dest: Ipv4Addr,
+    decr_ttl: bool,
 ) -> Vec<u8> {
     let data = Ipv4 {
         version: 4,
@@ -98,10 +114,15 @@ pub fn xlat_v6_to_v4(
         options: vec![],
         payload: ipv6_packet.payload().to_vec(),
     };
-    let mut buffer = vec![0; 20 + ipv6_packet.payload().len()];
-    let mut packet = MutableIpv4Packet::new(buffer.as_mut()).unwrap();
+    let mut packet = MutableIpv4Packet::owned(vec![0; 20 + ipv6_packet.payload().len()]).unwrap();
     packet.populate(&data);
     packet.set_checksum(checksum(&packet.to_immutable()));
+
+    // Decrement the TTL if needed
+    if decr_ttl {
+        packet.set_ttl(packet.get_ttl() - 1);
+    }
+
     let mut output = packet.to_immutable().packet().to_vec();
     // TODO: There is a bug here.. for now, force write header size
     output[0] = 0x45;
@@ -112,6 +133,7 @@ pub fn xlat_v4_to_v6(
     ipv4_packet: &Ipv4Packet,
     new_source: Ipv6Addr,
     new_dest: Ipv6Addr,
+    decr_ttl: bool,
 ) -> Vec<u8> {
     let data = Ipv6 {
         version: 6,
@@ -124,8 +146,13 @@ pub fn xlat_v4_to_v6(
         destination: new_dest,
         payload: ipv4_packet.payload().to_vec(),
     };
-    let mut buffer = vec![0; 40 + ipv4_packet.payload().len()];
-    let mut packet = MutableIpv6Packet::new(buffer.as_mut()).unwrap();
+    let mut packet = MutableIpv6Packet::owned(vec![0; 40 + ipv4_packet.payload().len()]).unwrap();
     packet.populate(&data);
+
+    // Decrement the TTL if needed
+    if decr_ttl {
+        packet.set_hop_limit(packet.get_hop_limit() - 1);
+    }
+
     packet.to_immutable().packet().to_vec()
 }

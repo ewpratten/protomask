@@ -11,11 +11,11 @@ use ipnet::{Ipv4Net, Ipv6Net};
 #[derive(Debug, serde::Deserialize)]
 pub struct InterfaceConfig {
     /// IPv4 router address
-    #[serde(rename = "Address4")]
-    pub address_v4: Ipv4Addr,
-    /// IPv6 router address
-    #[serde(rename = "Address6")]
-    pub address_v6: Ipv6Addr,
+    // #[serde(rename = "Address4")]
+    // pub address_v4: Ipv4Addr,
+    // /// IPv6 router address
+    // #[serde(rename = "Address6")]
+    // pub address_v6: Ipv6Addr,
     /// Ipv4 pool
     #[serde(rename = "Pool")]
     pub pool: Vec<Ipv4Net>,
@@ -42,7 +42,7 @@ fn default_reservation_duration() -> Duration {
 #[derive(Debug, serde::Deserialize)]
 pub struct RulesConfig {
     /// Static mapping rules
-    #[serde(rename = "MapStatic")]
+    #[serde(rename = "MapStatic", default="Vec::new")]
     pub static_map: Vec<AddressMappingRule>,
     /// How long to hold a dynamic mapping for
     #[serde(rename = "ReservationDuration", default="default_reservation_duration")]

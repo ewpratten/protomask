@@ -6,7 +6,11 @@ use std::{
 use ipnet::{Ipv4Net, Ipv6Net};
 use pnet_packet::ip::IpNextHeaderProtocols;
 
-use self::{interface::Nat64Interface, packet::IpPacket, table::Nat64Table};
+use self::{
+    interface::Nat64Interface,
+    packet::{IpPacket, PacketError},
+    table::{Nat64Table, TableError},
+};
 
 mod interface;
 mod packet;
@@ -21,6 +25,8 @@ pub enum Nat64Error {
     InterfaceError(#[from] interface::InterfaceError),
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+    #[error(transparent)]
+    UdpProxyError(#[from] xlat::UdpProxyError),
 }
 
 pub struct Nat64 {
@@ -66,14 +72,27 @@ impl Nat64 {
                     // Parse in to a more friendly format
                     match IpPacket::new(&buffer[..packet_len]) {
                         // Try to process the packet
-                        Ok(inbound_packet) => match self.process_packet(inbound_packet).await? {
-                            // If data is returned, send it back out the interface
-                            Some(outbound_packet) => {
-                                let packet_bytes = outbound_packet.to_bytes();
-                                self.interface.send(&packet_bytes)?;
-                            }
-                            // Otherwise, we can assume that the packet was dealt with, and can move on
-                            None => {}
+                        Ok(inbound_packet) => match self.process_packet(inbound_packet).await {
+                            Ok(inbound_packet) => match inbound_packet {
+                                // If data is returned, send it back out the interface
+                                Some(outbound_packet) => {
+                                    let packet_bytes = outbound_packet.to_bytes();
+                                    log::debug!("Sending packet: {:?}", packet_bytes);
+                                    self.interface.send(&packet_bytes).unwrap();
+                                }
+                                // Otherwise, we can assume that the packet was dealt with, and can move on
+                                None => {}
+                            },
+
+                            // Some errors are non-critical as far as this loop is concerned
+                            Err(error) => match error {
+                                Nat64Error::TableError(TableError::NoIpv6Mapping(address)) => {
+                                    log::debug!("No IPv6 mapping for {}", address);
+                                }
+                                error => {
+                                    return Err(error);
+                                }
+                            },
                         },
                         Err(error) => {
                             log::error!("Failed to parse packet: {}", error);
@@ -89,10 +108,10 @@ impl Nat64 {
 }
 
 impl Nat64 {
-    async fn process_packet(
+    async fn process_packet<'a>(
         &mut self,
-        packet: IpPacket<'_>,
-    ) -> Result<Option<IpPacket>, Nat64Error> {
+        packet: IpPacket<'a>,
+    ) -> Result<Option<IpPacket<'a>>, Nat64Error> {
         // The destination of the packet must be within a prefix we care about
         if match packet.get_destination() {
             IpAddr::V4(ipv4_addr) => !self.table.is_address_within_pool(&ipv4_addr),
@@ -136,7 +155,9 @@ impl Nat64 {
         match next_header_protocol {
             IpNextHeaderProtocols::Icmp => unimplemented!(),
             IpNextHeaderProtocols::Icmpv6 => unimplemented!(),
-            IpNextHeaderProtocols::Udp => unimplemented!(),
+            IpNextHeaderProtocols::Udp => Ok(Some(
+                xlat::proxy_udp_packet(packet, new_source, new_destination).await?,
+            )),
             IpNextHeaderProtocols::Tcp => unimplemented!(),
             next_header_protocol => {
                 log::warn!("Unsupported next header protocol: {}", next_header_protocol);

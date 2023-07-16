@@ -27,6 +27,10 @@ pub enum Nat64Error {
     IoError(#[from] std::io::Error),
     #[error(transparent)]
     UdpProxyError(#[from] xlat::UdpProxyError),
+    #[error(transparent)]
+    IcmpProxyError(#[from] xlat::IcmpProxyError),
+    #[error(transparent)]
+    TcpProxyError(#[from] xlat::TcpProxyError),
 }
 
 pub struct Nat64 {
@@ -77,6 +81,7 @@ impl Nat64 {
                                 // If data is returned, send it back out the interface
                                 Some(outbound_packet) => {
                                     let packet_bytes = outbound_packet.to_bytes();
+                                    log::debug!("Outbound packet next header: {}", outbound_packet.get_next_header().0);
                                     log::debug!("Sending packet: {:?}", packet_bytes);
                                     self.interface.send(&packet_bytes).unwrap();
                                 }
@@ -153,12 +158,15 @@ impl Nat64 {
             next_header_protocol
         );
         match next_header_protocol {
-            IpNextHeaderProtocols::Icmp => unimplemented!(),
-            IpNextHeaderProtocols::Icmpv6 => unimplemented!(),
+            IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => Ok(
+                xlat::proxy_icmp_packet(packet, new_source, new_destination)?,
+            ),
             IpNextHeaderProtocols::Udp => Ok(Some(
                 xlat::proxy_udp_packet(packet, new_source, new_destination).await?,
             )),
-            IpNextHeaderProtocols::Tcp => unimplemented!(),
+            IpNextHeaderProtocols::Tcp => Ok(Some(
+                xlat::proxy_tcp_packet(packet, new_source, new_destination).await?,
+            )),
             next_header_protocol => {
                 log::warn!("Unsupported next header protocol: {}", next_header_protocol);
                 Ok(None)

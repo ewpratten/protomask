@@ -139,7 +139,7 @@ pub fn xlat_v4_to_v6(
         version: 6,
         traffic_class: 0,
         flow_label: 0,
-        payload_length: 40 + ipv4_packet.payload().len() as u16,
+        payload_length: ipv4_packet.payload().len() as u16,
         next_header: ipv4_packet.get_next_level_protocol(),
         hop_limit: ipv4_packet.get_ttl(),
         source: new_source,

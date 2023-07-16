@@ -4,10 +4,12 @@ use bimap::BiMap;
 use colored::Colorize;
 use ipnet::{Ipv4Net, Ipv6Net};
 use pnet_packet::{
+    icmp::IcmpPacket,
     icmpv6::Icmpv6Packet,
     ip::IpNextHeaderProtocols,
+    ipv4::{self, Ipv4Packet, MutableIpv4Packet},
     ipv6::{Ipv6Packet, MutableIpv6Packet},
-    Packet, ipv4::{Ipv4Packet, MutableIpv4Packet}, icmp::IcmpPacket,
+    Packet,
 };
 use tokio::process::Command;
 use tun_tap::{Iface, Mode};
@@ -282,26 +284,31 @@ impl Nat64 {
                     }
 
                     // Handle inner packet conversion for protocols that don't support both v4 and v6
-                    if let Some(packet) = Ipv4Packet::owned(match packet.get_next_level_protocol() {
-                        // ICMP must be translated to ICMPv6
-                        IpNextHeaderProtocols::Icmp => {
-                            if let Some(new_payload) =
-                                icmp::icmp_to_icmpv6(&IcmpPacket::new(packet.payload()).unwrap())
-                            {
-                                // Mutate the input packet
-                                let mut packet =
-                                    MutableIpv4Packet::owned(packet.packet().to_vec()).unwrap();
-                                packet.set_next_level_protocol(IpNextHeaderProtocols::Icmpv6);
-                                packet.set_payload(&new_payload.packet().to_vec());
-                                packet.packet().to_vec()
-                            } else {
-                                return Ok(None);
+                    if let Some(packet) =
+                        Ipv4Packet::owned(match packet.get_next_level_protocol() {
+                            // ICMP must be translated to ICMPv6
+                            IpNextHeaderProtocols::Icmp => {
+                                if let Some(new_payload) = icmp::icmp_to_icmpv6(
+                                    &IcmpPacket::new(packet.payload()).unwrap(),
+                                    &new_source,
+                                    &new_dest,
+                                ) {
+                                    // Mutate the input packet
+                                    let mut packet =
+                                        MutableIpv4Packet::owned(packet.packet().to_vec()).unwrap();
+                                    packet.set_next_level_protocol(IpNextHeaderProtocols::Icmpv6);
+                                    packet.set_payload(&new_payload.packet().to_vec());
+                                    packet.set_checksum(ipv4::checksum(&packet.to_immutable()));
+                                    packet.packet().to_vec()
+                                } else {
+                                    return Ok(None);
+                                }
                             }
-                        }
 
-                        // By default, packets can be directly fed to the next function
-                        _ => packet.packet().to_vec(),
-                    }) {
+                            // By default, packets can be directly fed to the next function
+                            _ => packet.packet().to_vec(),
+                        })
+                    {
                         // Translate the packet
                         let translated = xlat_v4_to_v6(&packet, new_source, new_dest, true);
 
@@ -316,7 +323,6 @@ impl Nat64 {
                     } else {
                         return Ok(None);
                     }
-
                 } else {
                     return Ok(None);
                 }

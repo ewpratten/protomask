@@ -1,9 +1,11 @@
 //! ICMP packets require their own translation system
 
+use std::net::Ipv6Addr;
+
 use colored::Colorize;
 use pnet_packet::{
     icmp::{self, Icmp, IcmpCode, IcmpPacket, IcmpType, MutableIcmpPacket},
-    icmpv6::Icmpv6Packet,
+    icmpv6::{self, Icmpv6Packet, MutableIcmpv6Packet, Icmpv6, Icmpv6Type, Icmpv6Code},
     Packet,
 };
 
@@ -80,13 +82,17 @@ pub fn icmpv6_to_icmp<'a>(input: &'a Icmpv6Packet<'a>) -> Option<IcmpPacket<'a>>
     IcmpPacket::owned(output.to_immutable().packet().to_vec())
 }
 
-pub fn icmp_to_icmpv6<'a>(input: &'a IcmpPacket<'a>) -> Option<Icmpv6Packet<'a>> {
+pub fn icmp_to_icmpv6<'a>(
+    input: &'a IcmpPacket<'a>,
+    source: &Ipv6Addr,
+    dest: &Ipv6Addr,
+) -> Option<Icmpv6Packet<'a>> {
     let data = match input.get_icmp_type().0 {
         // Destination Unreachable
-        3 => Icmp {
-            icmp_type: IcmpType(1),
+        3 => Icmpv6 {
+            icmpv6_type: Icmpv6Type(1),
             // A best guess translation of ICMP codes. Feel free to open a PR to improve this :)
-            icmp_code: IcmpCode(match input.get_icmp_code().0 {
+            icmpv6_code: Icmpv6Code(match input.get_icmp_code().0 {
                 // Destination network unreachable -> No route to destination
                 0 => 0,
                 // Destination host unreachable -> Address unreachable
@@ -126,24 +132,24 @@ pub fn icmp_to_icmpv6<'a>(input: &'a IcmpPacket<'a>) -> Option<Icmpv6Packet<'a>>
             payload: input.payload().to_vec(),
         },
         // Time Exceeded
-        11 => Icmp {
-            icmp_type: IcmpType(3),
-            icmp_code: IcmpCode(input.get_icmp_code().0),
+        11 => Icmpv6 {
+            icmpv6_type: Icmpv6Type(3),
+            icmpv6_code: Icmpv6Code(input.get_icmp_code().0),
             checksum: 0,
             payload: input.payload().to_vec(),
         },
         // Echo Request
-        8 => Icmp {
-            icmp_type: IcmpType(128),
-            icmp_code: IcmpCode(0),
+        8 => Icmpv6 {
+            icmpv6_type: Icmpv6Type(128),
+            icmpv6_code: Icmpv6Code(0),
             checksum: 0,
             payload: input.payload().to_vec(),
         },
 
         // Echo Reply
-        0 => Icmp {
-            icmp_type: IcmpType(129),
-            icmp_code: IcmpCode(0),
+        0 => Icmpv6 {
+            icmpv6_type: Icmpv6Type(129),
+            icmpv6_code: Icmpv6Code(0),
             checksum: 0,
             payload: input.payload().to_vec(),
         },
@@ -158,14 +164,14 @@ pub fn icmp_to_icmpv6<'a>(input: &'a IcmpPacket<'a>) -> Option<Icmpv6Packet<'a>>
     {
         log::debug!("> Input ICMP Type: {}", input.get_icmp_type().0.to_string().bright_cyan());
         log::debug!("> Input ICMP Code: {}", input.get_icmp_code().0.to_string().bright_cyan());
-        log::debug!("> Output ICMP Type: {}", data.icmp_type.0.to_string().bright_cyan());
-        log::debug!("> Output ICMP Code: {}", data.icmp_code.0.to_string().bright_cyan());
+        log::debug!("> Output ICMP Type: {}", data.icmpv6_type.0.to_string().bright_cyan());
+        log::debug!("> Output ICMP Code: {}", data.icmpv6_code.0.to_string().bright_cyan());
     }
 
     // Create new ICMP packet
-    let mut output = MutableIcmpPacket::owned(vec![0u8; IcmpPacket::packet_size(&data)]).unwrap();
+    let mut output = MutableIcmpv6Packet::owned(vec![0u8; Icmpv6Packet::packet_size(&data)]).unwrap();
     output.populate(&data);
-    output.set_checksum(icmp::checksum(&output.to_immutable()));
+    output.set_checksum(icmpv6::checksum(&output.to_immutable(), source, dest));
 
     Icmpv6Packet::owned(output.to_immutable().packet().to_vec())
 }

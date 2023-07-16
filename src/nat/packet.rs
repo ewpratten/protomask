@@ -1,11 +1,8 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+//! A generic internet protocol packet type
 
-use pnet_packet::{
-    ip::IpNextHeaderProtocol,
-    ipv4::{checksum, Ipv4, Ipv4Packet, MutableIpv4Packet},
-    ipv6::{Ipv6, Ipv6Packet, MutableIpv6Packet},
-    Packet,
-};
+use std::net::IpAddr;
+
+use pnet_packet::{ip::IpNextHeaderProtocol, ipv4::Ipv4Packet, ipv6::Ipv6Packet, Packet};
 
 /// A protocol-agnostic packet type
 #[derive(Debug)]
@@ -91,68 +88,55 @@ impl IpPacket<'_> {
     }
 }
 
-pub fn xlat_v6_to_v4(
-    ipv6_packet: &Ipv6Packet,
-    new_source: Ipv4Addr,
-    new_dest: Ipv4Addr,
-    decr_ttl: bool,
-) -> Vec<u8> {
-    let data = Ipv4 {
-        version: 4,
-        header_length: 20,
-        dscp: 0,
-        ecn: 0,
-        total_length: 20 + ipv6_packet.payload().len() as u16,
-        identification: 0,
-        flags: 0,
-        fragment_offset: 0,
-        ttl: ipv6_packet.get_hop_limit(),
-        next_level_protocol: ipv6_packet.get_next_header(),
-        checksum: 0,
-        source: new_source,
-        destination: new_dest,
-        options: vec![],
-        payload: ipv6_packet.payload().to_vec(),
-    };
-    let mut packet = MutableIpv4Packet::owned(vec![0; 20 + ipv6_packet.payload().len()]).unwrap();
-    packet.populate(&data);
-    packet.set_checksum(checksum(&packet.to_immutable()));
+#[cfg(test)]
+mod tests {
+    use pnet_packet::{ipv4::MutableIpv4Packet, ipv6::MutableIpv6Packet};
 
-    // Decrement the TTL if needed
-    if decr_ttl {
-        packet.set_ttl(packet.get_ttl() - 1);
+    use super::*;
+
+    #[test]
+    fn test_ipv4_packet() {
+        // Build packet to test
+        let mut packet = MutableIpv4Packet::owned(vec![0; 20]).unwrap();
+        packet.set_version(4);
+        packet.set_source("192.0.2.1".parse().unwrap());
+        packet.set_destination("192.0.2.2".parse().unwrap());
+
+        // Parse
+        let header = packet.packet()[..20].to_vec();
+        let packet = IpPacket::new(packet.packet()).unwrap();
+        assert_eq!(
+            packet.get_source(),
+            IpAddr::V4("192.0.2.1".parse().unwrap())
+        );
+        assert_eq!(
+            packet.get_destination(),
+            IpAddr::V4("192.0.2.2".parse().unwrap())
+        );
+        assert_eq!(packet.get_header(), header);
     }
 
-    let mut output = packet.to_immutable().packet().to_vec();
-    // TODO: There is a bug here.. for now, force write header size
-    output[0] = 0x45;
-    output
-}
+    #[test]
+    fn test_ipv6_packet() {
+        // Build packet to test
+        let mut packet = MutableIpv6Packet::owned(vec![0; 40]).unwrap();
+        packet.set_version(6);
+        packet.set_source("2001:db8::c0a8:1".parse().unwrap());
+        packet.set_destination("2001:db8::c0a8:2".parse().unwrap());
 
-pub fn xlat_v4_to_v6(
-    ipv4_packet: &Ipv4Packet,
-    new_source: Ipv6Addr,
-    new_dest: Ipv6Addr,
-    decr_ttl: bool,
-) -> Vec<u8> {
-    let data = Ipv6 {
-        version: 6,
-        traffic_class: 0,
-        flow_label: 0,
-        payload_length: ipv4_packet.payload().len() as u16,
-        next_header: ipv4_packet.get_next_level_protocol(),
-        hop_limit: ipv4_packet.get_ttl(),
-        source: new_source,
-        destination: new_dest,
-        payload: ipv4_packet.payload().to_vec(),
-    };
-    let mut packet = MutableIpv6Packet::owned(vec![0; 40 + ipv4_packet.payload().len()]).unwrap();
-    packet.populate(&data);
+        // Parse
+        let header = packet.packet()[..40].to_vec();
+        let packet = IpPacket::new(packet.packet()).unwrap();
 
-    // Decrement the TTL if needed
-    if decr_ttl {
-        packet.set_hop_limit(packet.get_hop_limit() - 1);
+        // Test
+        assert_eq!(
+            packet.get_source(),
+            IpAddr::V6("2001:db8::c0a8:1".parse().unwrap())
+        );
+        assert_eq!(
+            packet.get_destination(),
+            IpAddr::V6("2001:db8::c0a8:2".parse().unwrap())
+        );
+        assert_eq!(packet.get_header(), header);
     }
-
-    packet.to_immutable().packet().to_vec()
 }

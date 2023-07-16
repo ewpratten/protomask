@@ -1,7 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
 use config::Config;
-use nat::Nat64;
 
 mod cli;
 mod config;
@@ -13,7 +12,7 @@ pub async fn main() {
     // Parse CLI args
     let args = cli::Args::parse();
 
-    // Set up logging
+    // Set up logging 
     fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -42,22 +41,20 @@ pub async fn main() {
     // Parse the config file
     let config = Config::load(args.config_file).unwrap();
 
-    // Create the NAT64 instance
-    let mut nat64 = Nat64::new(
-        config.interface.address_v4,
-        config.interface.address_v6,
-        config.interface.pool,
-        config.interface.prefix,
-        config
-            .rules
-            .static_map
-            .iter()
-            .map(|rule| (rule.v4, rule.v6))
-            .collect(),
-    )
-    .await
-    .unwrap();
+    // // Create the NAT64 instance
+    // let mut nat64 = Nat64::new(
+    //     config.interface.pool,
+    //     config.interface.prefix,
+    //     config
+    //         .rules
+    //         .static_map
+    //         .iter()
+    //         .map(|rule| (rule.v4, rule.v6))
+    //         .collect(),
+    // )
+    // .await
+    // .unwrap();
 
-    // Handle packets
-    nat64.run().await.unwrap();
+    // // Handle packets
+    // nat64.run().await.unwrap();
 }

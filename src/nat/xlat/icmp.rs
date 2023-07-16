@@ -1,4 +1,4 @@
-//! ICMP packets require their own translation system
+//! Translation logic for ICMP and ICMPv6
 
 use std::net::Ipv6Addr;
 

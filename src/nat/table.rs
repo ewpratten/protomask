@@ -9,7 +9,7 @@ use ipnet::Ipv4Net;
 
 /// Possible errors thrown in the address reservation process
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum TableError {
     #[error("Address already reserved: {0}")]
     AddressAlreadyReserved(IpAddr),
     #[error("Address pool depleted")]
@@ -49,13 +49,13 @@ impl Nat64Table {
         &mut self,
         ipv6: Ipv6Addr,
         ipv4: Ipv4Addr,
-    ) -> Result<(), Error> {
+    ) -> Result<(), TableError> {
         // Check if either address is already reserved
         self.prune();
         if self.reservations.contains_left(&ipv6) {
-            return Err(Error::AddressAlreadyReserved(ipv6.into()));
+            return Err(TableError::AddressAlreadyReserved(ipv6.into()));
         } else if self.reservations.contains_right(&ipv4) {
-            return Err(Error::AddressAlreadyReserved(ipv4.into()));
+            return Err(TableError::AddressAlreadyReserved(ipv4.into()));
         }
 
         // Add the reservation
@@ -65,7 +65,7 @@ impl Nat64Table {
     }
 
     /// Get or assign an IPv4 address for the given IPv6 address
-    pub fn get_or_assign_ipv4(&mut self, ipv6: Ipv6Addr) -> Result<Ipv4Addr, Error> {
+    pub fn get_or_assign_ipv4(&mut self, ipv6: Ipv6Addr) -> Result<Ipv4Addr, TableError> {
         // Prune old reservations
         self.prune();
 
@@ -94,7 +94,7 @@ impl Nat64Table {
         }
 
         // If we get here, we failed to find an available address
-        Err(Error::AddressPoolDepleted)
+        Err(TableError::AddressPoolDepleted)
     }
 
     /// Try to find an IPv6 address for the given IPv4 address

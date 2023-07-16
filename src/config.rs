@@ -1,6 +1,7 @@
 use std::{
     net::{Ipv4Addr, Ipv6Addr},
     path::Path,
+    time::Duration,
 };
 
 use colored::Colorize;
@@ -32,12 +33,20 @@ pub struct AddressMappingRule {
     pub v6: Ipv6Addr,
 }
 
+/// Used to generate the default reservation duration
+fn default_reservation_duration() -> Duration {
+    Duration::from_secs(7200)
+}
+
 /// Rules config
 #[derive(Debug, serde::Deserialize)]
 pub struct RulesConfig {
     /// Static mapping rules
     #[serde(rename = "MapStatic")]
     pub static_map: Vec<AddressMappingRule>,
+    /// How long to hold a dynamic mapping for
+    #[serde(rename = "ReservationDuration", default="default_reservation_duration")]
+    pub reservation_duration: Duration,
 }
 
 /// Representation of the `protomask.toml` config file

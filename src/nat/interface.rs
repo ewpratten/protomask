@@ -15,11 +15,13 @@ pub enum InterfaceError {
 pub struct Nat64Interface {
     /// Underlying TUN interface
     interface: Iface,
+    /// Interface MTU
+    mtu: usize,
 }
 
 impl Nat64Interface {
     /// Create a new NAT64 interface
-    pub async fn new(v6_prefix: Ipv6Net, v4_pool: Vec<Ipv4Net>) -> Result<Self, InterfaceError> {
+    pub async fn new(v6_prefix: Ipv6Net, v4_pool: &Vec<Ipv4Net>) -> Result<Self, InterfaceError> {
         // Bring up an rtnetlink connection
         let (rt_connection, rt_handle, _) = rtnetlink::new_connection()?;
         tokio::spawn(rt_connection);
@@ -52,8 +54,13 @@ impl Nat64Interface {
             .add()
             .v6()
             .destination_prefix(v6_prefix.addr(), v6_prefix.prefix_len())
+            .output_interface(interface_link.header.index)
             .execute()
-            .await?;
+            .await
+            .map_err(|error| {
+                log::error!("Failed to add route for {}: {}", v6_prefix, error);
+                error
+            })?;
         log::info!("Added route: {} via {}", v6_prefix, interface.name());
 
         // Add every prefix in the v4 pool as a route
@@ -63,12 +70,26 @@ impl Nat64Interface {
                 .add()
                 .v4()
                 .destination_prefix(prefix.addr(), prefix.prefix_len())
+                .output_interface(interface_link.header.index)
                 .execute()
-                .await?;
+                .await
+                .map_err(|error| {
+                    log::error!("Failed to add route for {}: {}", prefix, error);
+                    error
+                })?;
             log::info!("Added route: {} via {}", prefix, interface.name());
         }
 
-        Ok(Self { interface })
+        // Read the interface MTU
+        let mtu: usize =
+            std::fs::read_to_string(format!("/sys/class/net/{}/mtu", interface.name()))
+                .expect("Failed to read interface MTU")
+                .strip_suffix("\n")
+                .unwrap()
+                .parse()
+                .unwrap();
+
+        Ok(Self { interface, mtu })
     }
 
     /// Get the interface mode
@@ -79,6 +100,11 @@ impl Nat64Interface {
     /// Get the interface name
     pub fn name(&self) -> &str {
         self.interface.name()
+    }
+
+    /// Get the interface MTU
+    pub fn mtu(&self) -> usize {
+        self.mtu
     }
 
     /// Receive a packet from the interface

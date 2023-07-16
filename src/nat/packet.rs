@@ -4,6 +4,14 @@ use std::net::IpAddr;
 
 use pnet_packet::{ip::IpNextHeaderProtocol, ipv4::Ipv4Packet, ipv6::Ipv6Packet, Packet};
 
+#[derive(Debug, thiserror::Error)]
+pub enum PacketError {
+    #[error("Packed too small (len: {0})")]
+    PacketTooSmall(usize),
+    #[error("Unknown Internet Protocol version: {0}")]
+    UnknownVersion(u8),
+}
+
 /// A protocol-agnostic packet type
 #[derive(Debug)]
 pub enum IpPacket<'a> {
@@ -15,11 +23,16 @@ pub enum IpPacket<'a> {
 
 impl IpPacket<'_> {
     /// Creates a new packet from a byte slice
-    pub fn new<'a>(bytes: &'a [u8]) -> Option<IpPacket<'a>> {
+    pub fn new<'a>(bytes: &'a [u8]) -> Result<IpPacket<'a>, PacketError> {
+        // Parse the packet. If there is an error, cast None to the error type
         match bytes[0] >> 4 {
-            4 => Some(IpPacket::V4(Ipv4Packet::new(bytes)?)),
-            6 => Some(IpPacket::V6(Ipv6Packet::new(bytes)?)),
-            _ => None,
+            4 => Ok(IpPacket::V4(
+                Ipv4Packet::new(bytes).ok_or_else(|| PacketError::PacketTooSmall(bytes.len()))?,
+            )),
+            6 => Ok(IpPacket::V6(
+                Ipv6Packet::new(bytes).ok_or_else(|| PacketError::PacketTooSmall(bytes.len()))?,
+            )),
+            n => Err(PacketError::UnknownVersion(n)),
         }
     }
 

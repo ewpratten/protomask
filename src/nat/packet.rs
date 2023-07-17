@@ -53,6 +53,7 @@ impl IpPacket<'_> {
     }
 
     /// Returns the packet header
+    #[allow(dead_code)]
     pub fn get_header(&self) -> &[u8] {
         match self {
             IpPacket::V4(packet) => packet.packet()[..20].as_ref(),
@@ -61,6 +62,7 @@ impl IpPacket<'_> {
     }
 
     /// Returns the packet payload
+    #[allow(dead_code)]
     pub fn get_payload(&self) -> &[u8] {
         match self {
             IpPacket::V4(packet) => packet.payload(),
@@ -77,6 +79,7 @@ impl IpPacket<'_> {
     }
 
     /// Returns the packet length
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         match self {
             IpPacket::V4(packet) => packet.packet().len(),
@@ -93,6 +96,7 @@ impl IpPacket<'_> {
     }
 
     /// Get the TTL
+    #[allow(dead_code)]
     pub fn get_ttl(&self) -> u8 {
         match self {
             IpPacket::V4(packet) => packet.get_ttl(),

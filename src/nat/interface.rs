@@ -93,11 +93,13 @@ impl Nat64Interface {
     }
 
     /// Get the interface mode
+    #[allow(dead_code)]
     pub fn mode(&self) -> Mode {
         self.interface.mode()
     }
 
-    /// Get the interface name
+    /// Get the interface nam
+    #[allow(dead_code)]
     pub fn name(&self) -> &str {
         self.interface.name()
     }

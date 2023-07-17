@@ -5,7 +5,7 @@ authors = ["Evan Pratten <ewpratten@gmail.com>"]
 edition = "2021"
 description = "A user space NAT64 implementation"
 readme = "README.md"
-homepage = "https://protomask.ewpratten.com"
+homepage = "https://github.com/ewpratten/protomask"
 documentation = "https://docs.rs/protomask"
 repository = "https://github.com/ewpratten/protomask"
 license = "GPL-3.0"
@@ -33,3 +33,12 @@ futures = "0.3.28"
 [[bin]]
 name = "protomask"
 path = "src/main.rs"
+
+[package.metadata.rpm]
+package = "protomask"
+
+[package.metadata.rpm.cargo]
+buildflags = ["--release"]
+
+[package.metadata.rpm.targets]
+protomask = { path = "/usr/bin/protomask" }

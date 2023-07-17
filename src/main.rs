@@ -6,7 +6,6 @@ use nat::Nat64;
 mod cli;
 mod config;
 mod nat;
-mod types;
 
 #[tokio::main]
 pub async fn main() {

@@ -4,15 +4,18 @@ use std::{
 };
 
 use ipnet::{Ipv4Net, Ipv6Net};
-use pnet_packet::ip::IpNextHeaderProtocols;
+use pnet_packet::{ip::IpNextHeaderProtocols, Packet};
+
+use crate::{into_udp, ipv4_packet, ipv6_packet, nat::xlat::translate_udp_4_to_6};
 
 use self::{
     interface::Nat64Interface,
-    packet::{IpPacket, PacketError},
+    packet::IpPacket,
     table::{Nat64Table, TableError},
 };
 
 mod interface;
+mod macros;
 mod packet;
 mod table;
 mod xlat;
@@ -26,11 +29,7 @@ pub enum Nat64Error {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
     #[error(transparent)]
-    UdpProxyError(#[from] xlat::UdpProxyError),
-    #[error(transparent)]
-    IcmpProxyError(#[from] xlat::IcmpProxyError),
-    #[error(transparent)]
-    TcpProxyError(#[from] xlat::TcpProxyError),
+    XlatError(#[from] xlat::PacketTranslationError),
 }
 
 pub struct Nat64 {
@@ -81,7 +80,10 @@ impl Nat64 {
                                 // If data is returned, send it back out the interface
                                 Some(outbound_packet) => {
                                     let packet_bytes = outbound_packet.to_bytes();
-                                    log::debug!("Outbound packet next header: {}", outbound_packet.get_next_header().0);
+                                    log::debug!(
+                                        "Outbound packet next header: {}",
+                                        outbound_packet.get_next_header().0
+                                    );
                                     log::debug!("Sending packet: {:?}", packet_bytes);
                                     self.interface.send(&packet_bytes).unwrap();
                                 }
@@ -152,25 +154,71 @@ impl Nat64 {
         );
 
         // Different logic is required for ICMP, UDP, and TCP
-        let next_header_protocol = packet.get_next_header();
-        log::debug!(
-            "Incoming packet has next header protocol: {}",
-            next_header_protocol
-        );
-        match next_header_protocol {
-            IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => Ok(
-                xlat::proxy_icmp_packet(packet, new_source, new_destination)?,
-            ),
-            IpNextHeaderProtocols::Udp => Ok(Some(
-                xlat::proxy_udp_packet(packet, new_source, new_destination).await?,
-            )),
-            IpNextHeaderProtocols::Tcp => Ok(Some(
-                xlat::proxy_tcp_packet(packet, new_source, new_destination).await?,
-            )),
-            next_header_protocol => {
-                log::warn!("Unsupported next header protocol: {}", next_header_protocol);
-                Ok(None)
+        match (packet, new_source, new_destination) {
+            (IpPacket::V4(packet), IpAddr::V6(new_source), IpAddr::V6(new_destination)) => {
+                match packet.get_next_level_protocol() {
+                    // User Datagram Protocol
+                    IpNextHeaderProtocols::Udp => Ok(Some(IpPacket::V6(ipv6_packet!(
+                        new_source,
+                        new_destination,
+                        IpNextHeaderProtocols::Udp,
+                        packet.get_ttl(),
+                        translate_udp_4_to_6(
+                            into_udp!(packet.payload().to_vec())?,
+                            new_source,
+                            new_destination
+                        )?
+                        .packet()
+                    )))),
+
+                    // For any protocol we don't support, just warn and drop the packet
+                    next_level_protocol => {
+                        log::warn!("Unsupported next level protocol: {}", next_level_protocol);
+                        Ok(None)
+                    }
+                }
             }
+            (IpPacket::V6(packet), IpAddr::V4(new_source), IpAddr::V4(new_destination)) => {
+                match packet.get_next_header() {
+                    // User Datagram Protocol
+                    IpNextHeaderProtocols::Udp => Ok(Some(IpPacket::V4(ipv4_packet!(
+                        new_source,
+                        new_destination,
+                        packet.get_hop_limit(),
+                        IpNextHeaderProtocols::Udp,
+                        xlat::translate_udp_6_to_4(
+                            into_udp!(packet.payload().to_vec())?,
+                            new_source,
+                            new_destination
+                        )?
+                        .packet()
+                    )))),
+
+                    // For any protocol we don't support, just warn and drop the packet
+                    next_header_protocol => {
+                        log::warn!("Unsupported next header protocol: {}", next_header_protocol);
+                        Ok(None)
+                    }
+                }
+            }
+
+            // Honestly, this should probably be `unreachable!()`
+            _ => unimplemented!(),
         }
+        // match next_header_protocol {
+        //     IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => Ok(
+        //         xlat::proxy_icmp_packet(packet, new_source, new_destination)?,
+        //     ),
+        //     IpNextHeaderProtocols::Udp => Ok(Some(
+        //         xlat::proxy_udp_packet(packet, new_source, new_destination).await?,
+        //     )),
+        //     IpNextHeaderProtocols::Tcp => Ok(Some(
+        //         xlat::proxy_tcp_packet(packet, new_source, new_destination).await?,
+        //     )),
+        //     next_header_protocol => {
+        //         log::warn!("Unsupported next header protocol: {}", next_header_protocol);
+        //         Ok(None)
+        //     }
+        // }
     }
 }

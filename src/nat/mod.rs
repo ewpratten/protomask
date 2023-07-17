@@ -119,6 +119,8 @@ impl Nat64 {
 }
 
 impl Nat64 {
+
+    #[profiling::function]
     async fn process_packet<'a>(
         &mut self,
         packet: IpPacket<'a>,

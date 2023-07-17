@@ -67,6 +67,7 @@ impl Nat64Table {
     }
 
     /// Get or assign an IPv4 address for the given IPv6 address
+    #[profiling::function]
     pub fn get_or_assign_ipv4(&mut self, ipv6: Ipv6Addr) -> Result<Ipv4Addr, TableError> {
         // Prune old reservations
         self.prune();
@@ -100,6 +101,7 @@ impl Nat64Table {
     }
 
     /// Try to find an IPv6 address for the given IPv4 address
+    #[profiling::function]
     pub fn get_reverse(&mut self, ipv4: Ipv4Addr) -> Result<Ipv6Addr, TableError> {
         // Prune old reservations
         self.prune();
@@ -124,6 +126,7 @@ impl Nat64Table {
     }
 
     /// Calculate the translated version of any address
+    #[profiling::function]
     pub fn calculate_xlat_addr(
         &mut self,
         input: &IpAddr,
@@ -176,6 +179,7 @@ impl Nat64Table {
 
 impl Nat64Table {
     /// Prune old reservations
+    #[profiling::function]
     pub fn prune(&mut self) {
         let now = Instant::now();
 

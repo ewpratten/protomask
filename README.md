@@ -13,7 +13,9 @@ Protomask listens on an IPv6 `/96` prefix for incoming traffic.
 
 When traffic destined for an [embedded IPv4 address](https://datatracker.ietf.org/doc/html/rfc6052) is received, the source IPv6 address is assigned a real IPv4 address from a pool of addresses on a first-come-first-serve basis.
 
-All further packet from that source IPv6 address will be NAT-ed through its assigned IPv4 address until the reservation expires. The reverse process happens for return traffic too.
+All further packets from that source IPv6 address will be NATed through its assigned IPv4 address until the reservation expires. The reverse of this process happens for return traffic.
+
+Hosts that require a stable IPv4 address may be assigned a static mapping in the configuration file.
 
 ## Configuration
 
@@ -32,4 +34,36 @@ Pool = ["192.0.2.0/24"]
 MapStatic = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]
 # How many seconds to keep a dynamic mapping alive for
 ReservationDuration = 7200 # Optional
+```
+
+## Installation
+
+Protomask can be installed using various methods:
+
+### Using Cargo
+
+```bash
+cargo install protomask
+```
+
+### From source
+
+```bash
+git clone https://github.com/ewpratten/protomask
+cd protomask
+cargo install --path .
+```
+
+## Usage
+
+```text
+Usage: protomask [OPTIONS] <CONFIG_FILE>
+
+Arguments:
+  <CONFIG_FILE>  Path to the config file
+
+Options:
+  -v, --verbose  Enable verbose logging
+  -h, --help     Print help
+  -V, --version  Print version
 ```

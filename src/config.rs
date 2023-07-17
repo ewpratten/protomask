@@ -7,17 +7,6 @@ use std::{
 use colored::Colorize;
 use ipnet::{Ipv4Net, Ipv6Net};
 
-/// Interface config
-#[derive(Debug, serde::Deserialize)]
-pub struct InterfaceConfig {
-    /// Ipv4 pool
-    #[serde(rename = "Pool")]
-    pub pool: Vec<Ipv4Net>,
-    /// IPv6 prefix
-    #[serde(rename = "Prefix")]
-    pub prefix: Ipv6Net,
-}
-
 /// A static mapping rule
 #[derive(Debug, serde::Deserialize)]
 pub struct AddressMappingRule {
@@ -34,16 +23,19 @@ fn default_reservation_duration() -> u64 {
 
 /// Rules config
 #[derive(Debug, serde::Deserialize)]
-pub struct RulesConfig {
+pub struct PoolConfig {
+    /// Pool prefixes
+    #[serde(rename = "Prefixes")]
+    pub prefixes: Vec<Ipv4Net>,
     /// Static mapping rules
-    #[serde(rename = "MapStatic", default="Vec::new")]
+    #[serde(rename = "Static", default = "Vec::new")]
     pub static_map: Vec<AddressMappingRule>,
     /// How long to hold a dynamic mapping for
-    #[serde(rename = "ReservationDuration", default="default_reservation_duration")]
+    #[serde(rename = "MaxIdleDuration", default = "default_reservation_duration")]
     reservation_duration: u64,
 }
 
-impl RulesConfig {
+impl PoolConfig {
     /// Get the reservation duration
     pub fn reservation_duration(&self) -> Duration {
         Duration::from_secs(self.reservation_duration)
@@ -53,12 +45,12 @@ impl RulesConfig {
 /// Representation of the `protomask.toml` config file
 #[derive(Debug, serde::Deserialize)]
 pub struct Config {
-    /// Interface config
-    #[serde(rename = "Interface")]
-    pub interface: InterfaceConfig,
-    /// Rules config
-    #[serde(rename = "Rules")]
-    pub rules: RulesConfig,
+    /// The NAT64 prefix
+    #[serde(rename = "Nat64Prefix")]
+    pub nat64_prefix: Ipv6Net,
+    /// Pool configuration
+    #[serde(rename = "Pool")]
+    pub pool: PoolConfig,
 }
 
 impl Config {
@@ -82,5 +74,16 @@ impl Config {
                 std::process::exit(1);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that fails if the example file is not valid
+    #[test]
+    fn ensure_example_is_valid() {
+        let _ = Config::load("protomask.toml").unwrap();
     }
 }

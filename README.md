@@ -22,18 +22,16 @@ Hosts that require a stable IPv4 address may be assigned a static mapping in the
 Protomask uses a [TOML](https://toml.io) configuration file. Here is a functional example:
 
 ```toml
-[Interface]
-# The IPv6 prefix to listen for V6 traffic on
-Prefix = "64:ff9b::/96"
-# A list of IPv4 prefixes to map V6 traffic to
-Pool = ["192.0.2.0/24"]
+# The NAT64 prefix to route to protomask
+Nat64Prefix = "64:ff9b::/96"
 
-[Rules]
-# A static mapping of IPv4 and IPv6 addresses
-# These addresses will not used in the dynamic pool
-MapStatic = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]
-# How many seconds to keep a dynamic mapping alive for
-ReservationDuration = 7200 # Optional
+[Pool]
+# All prefixes in the pool
+Prefixes = ["192.0.2.0/24"]
+# The maximum duration a prefix will be reserved for after becoming idle
+MaxIdleDuration = 7200 # Optional, seconds. Defaults to 7200 (2 hours)
+# Permanent address mappings
+Static = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]
 ```
 
 ## Installation

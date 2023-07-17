@@ -1,14 +1,12 @@
-# Example configuration file for protomask
-[Interface]
-# Addresses to use for ICMP messaging
-Address4 = "192.0.2.1"
-Address6 = "2001:db8:1::1"
-# A list of IPv4 prefixes to NAT to
-Pool = ["192.0.2.0/24"]
-# The IPv6 prefix to listen for traffic on
-Prefix = "64:ff9b::/96"
+# Protomask example configuraiton file
 
-[Rules]
-# A static mapping of IPv4 and IPv6 addresses
-# These addresses will be exclusively reserved, and not used in the general pool
-MapStatic = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]
+# The NAT64 prefix to route to protomask
+Nat64Prefix = "64:ff9b::/96"
+
+[Pool]
+# All prefixes in the pool
+Prefixes = ["192.0.2.0/24"]
+# The maximum duration a prefix will be reserved for after becoming idle
+MaxIdleDuration = 7200 # Optional, seconds. Defaults to 7200 (2 hours)
+# Permanent address mappings
+Static = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]

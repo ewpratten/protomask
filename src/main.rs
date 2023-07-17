@@ -20,6 +20,7 @@ pub async fn main() {
                 "{}: {}",
                 format!(
                     "{}{}",
+                    // Level messages are padded to keep the output looking somewhat sane
                     match record.level() {
                         log::Level::Error => "ERROR".red().bold().to_string(),
                         log::Level::Warn => "WARN ".yellow().bold().to_string(),
@@ -27,8 +28,9 @@ pub async fn main() {
                         log::Level::Debug => "DEBUG".bright_blue().bold().to_string(),
                         log::Level::Trace => "TRACE".bright_white().bold().to_string(),
                     },
+                    // Only show the outer package name if verbose logging is enabled (otherwise nothing)
                     match log_verbose {
-                        true => format!(" [{:13}]", record.target().split("::").nth(0).unwrap()),
+                        true => format!(" [{}]", record.target().split("::").nth(0).unwrap()),
                         false => String::new(),
                     }
                     .bright_black()
@@ -50,17 +52,23 @@ pub async fn main() {
     // Parse the config file
     let config = Config::load(args.config_file).unwrap();
 
+    // Currently, only a /96 is supported
+    if config.nat64_prefix.prefix_len() != 96 {
+        log::error!("Only a /96 prefix is supported for the NAT64 prefix");
+        std::process::exit(1);
+    }
+
     // Create the NAT64 instance
     let mut nat64 = Nat64::new(
-        config.interface.prefix,
-        config.interface.pool,
+        config.nat64_prefix,
+        config.pool.prefixes.clone(),
         config
-            .rules
+            .pool
             .static_map
             .iter()
             .map(|rule| (rule.v6, rule.v4))
             .collect(),
-        config.rules.reservation_duration(),
+        config.pool.reservation_duration(),
     )
     .await
     .unwrap();

@@ -1,3 +1,23 @@
+/// Quickly convert a byte slice into an ICMP packet
+#[macro_export]
+macro_rules! into_icmp {
+    ($bytes:expr) => {
+        pnet_packet::icmp::IcmpPacket::owned($bytes).ok_or_else(|| {
+            crate::nat::xlat::PacketTranslationError::InputPacketTooShort($bytes.len())
+        })
+    };
+}
+
+/// Quickly convert a byte slice into an ICMPv6 packet
+#[macro_export]
+macro_rules! into_icmpv6 {
+    ($bytes:expr) => {
+        pnet_packet::icmpv6::Icmpv6Packet::owned($bytes).ok_or_else(|| {
+            crate::nat::xlat::PacketTranslationError::InputPacketTooShort($bytes.len())
+        })
+    };
+}
+
 /// Quickly convert a byte slice into a UDP packet
 #[macro_export]
 macro_rules! into_udp {

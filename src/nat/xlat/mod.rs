@@ -4,7 +4,7 @@ mod icmp;
 mod tcp;
 mod udp;
 
-pub use icmp::{proxy_icmp_packet, IcmpProxyError};
+pub use icmp::{translate_icmp_4_to_6, translate_icmp_6_to_4};
 pub use tcp::{translate_tcp_4_to_6, translate_tcp_6_to_4};
 pub use udp::{translate_udp_4_to_6, translate_udp_6_to_4};
 

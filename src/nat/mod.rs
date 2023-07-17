@@ -6,7 +6,9 @@ use std::{
 use ipnet::{Ipv4Net, Ipv6Net};
 use pnet_packet::{ip::IpNextHeaderProtocols, Packet};
 
-use crate::{into_tcp, into_udp, ipv4_packet, ipv6_packet, nat::xlat::translate_udp_4_to_6};
+use crate::{
+    into_icmp, into_tcp, into_udp, ipv4_packet, ipv6_packet, nat::xlat::translate_udp_4_to_6, into_icmpv6,
+};
 
 use self::{
     interface::Nat64Interface,
@@ -157,6 +159,22 @@ impl Nat64 {
         match (packet, new_source, new_destination) {
             (IpPacket::V4(packet), IpAddr::V6(new_source), IpAddr::V6(new_destination)) => {
                 match packet.get_next_level_protocol() {
+                    // Internet Control Message Protocol
+                    IpNextHeaderProtocols::Icmp => match xlat::translate_icmp_4_to_6(
+                        into_icmp!(packet.payload().to_vec())?,
+                        new_source,
+                        new_destination,
+                    )? {
+                        Some(icmp_packet) => Ok(Some(IpPacket::V6(ipv6_packet!(
+                            new_source,
+                            new_destination,
+                            IpNextHeaderProtocols::Icmp,
+                            packet.get_ttl(),
+                            icmp_packet.packet()
+                        )))),
+                        None => Ok(None),
+                    },
+
                     // User Datagram Protocol
                     IpNextHeaderProtocols::Udp => Ok(Some(IpPacket::V6(ipv6_packet!(
                         new_source,
@@ -194,6 +212,22 @@ impl Nat64 {
             }
             (IpPacket::V6(packet), IpAddr::V4(new_source), IpAddr::V4(new_destination)) => {
                 match packet.get_next_header() {
+                    // Internet Control Message Protocol Version 6
+                    IpNextHeaderProtocols::Icmpv6 => match xlat::translate_icmp_6_to_4(
+                        into_icmpv6!(packet.payload().to_vec())?,
+                        new_source,
+                        new_destination,
+                    )? {
+                        Some(icmp_packet) => Ok(Some(IpPacket::V4(ipv4_packet!(
+                            new_source,
+                            new_destination,
+                            packet.get_hop_limit(),
+                            IpNextHeaderProtocols::Icmp,
+                            icmp_packet.packet()
+                        )))),
+                        None => Ok(None),
+                    },
+
                     // User Datagram Protocol
                     IpNextHeaderProtocols::Udp => Ok(Some(IpPacket::V4(ipv4_packet!(
                         new_source,

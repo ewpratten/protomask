@@ -11,7 +11,7 @@ use pnet_packet::{
     Packet,
 };
 
-use crate::{icmpv6_packet, ipv4_packet, ipv6_packet, icmp_packet};
+use crate::{icmp_packet, icmpv6_packet, ipv4_packet, ipv6_packet};
 
 use super::PacketTranslationError;
 
@@ -130,7 +130,7 @@ pub fn translate_icmp_4_to_6(
     {
         // "Time Exceeded" requires an additional payload be embedded in the packet
         // This payload looks like: 4bytes + IPv6(data)
-        let mut output_payload = vec![];
+        let mut output_payload = icmp_packet.payload().to_vec();
         if icmpv6_type == Icmpv6Types::TimeExceeded {
             // Get access to the original payload
             let original_payload =
@@ -153,10 +153,14 @@ pub fn translate_icmp_4_to_6(
                         new_source,
                         new_dest,
                         icmpv6_type,
-                        icmpv6_code
+                        icmpv6_code,
+                        &original_payload_inner[4..]
                     );
                     original_payload_inner = inner_icmpv6.packet().to_vec();
-                    log::debug!("Translated inner ICMPv6 packet: {:?}", original_payload_inner);
+                    log::debug!(
+                        "Translated inner ICMPv6 packet: {:?}",
+                        original_payload_inner
+                    );
                 }
             }
 
@@ -173,9 +177,8 @@ pub fn translate_icmp_4_to_6(
             );
 
             // Set the payload
-            let mut payload = vec![0u8; 4 + new_payload_packet.packet().len()];
-            payload[4..].copy_from_slice(new_payload_packet.packet());
-            output_payload = payload;
+            output_payload = vec![0u8; 4 + new_payload_packet.packet().len()];
+            output_payload[4..].copy_from_slice(new_payload_packet.packet());
         }
 
         // Create a new ICMPv6 packet for the translated values to be stored in
@@ -190,6 +193,10 @@ pub fn translate_icmp_4_to_6(
         output.set_icmpv6_type(icmpv6_type);
         output.set_icmpv6_code(icmpv6_code);
 
+        // Set the payload
+        log::debug!("Setting ICMPv6 payload: {:?}", output_payload);
+        output.set_payload(&output_payload);
+
         // Calculate the checksum
         output.set_checksum(0);
         output.set_checksum(icmpv6::checksum(
@@ -197,9 +204,6 @@ pub fn translate_icmp_4_to_6(
             &new_source,
             &new_dest,
         ));
-
-        // Set the payload
-        output.set_payload(&output_payload);
 
         // Return the translated packet
         return Ok(Some(
@@ -236,7 +240,7 @@ pub fn translate_icmp_6_to_4(
     ) {
         // "Time Exceeded" requires an additional payload be embedded in the packet
         // This payload looks like: 4bytes + IPv6(8bytes)
-        let mut output_payload = vec![];
+        let mut output_payload = icmpv6_packet.payload().to_vec();
         if icmp_type == IcmpTypes::TimeExceeded {
             // Get access to the original payload
             let original_payload =
@@ -257,10 +261,8 @@ pub fn translate_icmp_6_to_4(
                     Icmpv6Type(original_payload_inner[0]),
                     Icmpv6Code(original_payload_inner[1]),
                 ) {
-                    let inner_icmp = icmp_packet!(
-                        icmp_type,
-                        icmp_code
-                    );
+                    let inner_icmp =
+                        icmp_packet!(icmp_type, icmp_code, &original_payload_inner[8..]);
                     original_payload_inner = inner_icmp.packet().to_vec();
                     log::debug!("Translated inner ICMP packet: {:?}", original_payload_inner);
                 }
@@ -279,9 +281,8 @@ pub fn translate_icmp_6_to_4(
             );
 
             // Set the payload
-            let mut payload = vec![0u8; 4 + new_payload_packet.packet().len()];
-            payload[4..].copy_from_slice(new_payload_packet.packet());
-            output_payload = payload;
+            output_payload = vec![0u8; 4 + new_payload_packet.packet().len()];
+            output_payload[4..].copy_from_slice(new_payload_packet.packet());
         }
 
         // Create a new ICMP packet for the translated values to be stored in

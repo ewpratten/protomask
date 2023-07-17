@@ -19,6 +19,6 @@ ip netns exec protomask firewall-cmd --zone=trusted --add-interface=test1
 ip netns exec protomask firewall-cmd --zone=trusted --add-interface=test2
 
 # Run protomask
-ip netns exec protomask ./target/debug/protomask protomask.toml -v
+ip netns exec protomask ./target/x86_64-unknown-linux-musl/debug/protomask protomask.toml -v
 
 

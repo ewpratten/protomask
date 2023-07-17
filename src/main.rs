@@ -1,11 +1,12 @@
 use clap::Parser;
-use colored::Colorize;
 use config::Config;
+use logging::enable_logger;
 use nat::Nat64;
 
 mod cli;
 mod config;
 mod nat;
+mod logging;
 
 #[tokio::main]
 pub async fn main() {
@@ -13,41 +14,7 @@ pub async fn main() {
     let args = cli::Args::parse();
 
     // Set up logging
-    let log_verbose = args.verbose;
-    fern::Dispatch::new()
-        .format(move |out, message, record| {
-            out.finish(format_args!(
-                "{}: {}",
-                format!(
-                    "{}{}",
-                    // Level messages are padded to keep the output looking somewhat sane
-                    match record.level() {
-                        log::Level::Error => "ERROR".red().bold().to_string(),
-                        log::Level::Warn => "WARN ".yellow().bold().to_string(),
-                        log::Level::Info => "INFO ".green().bold().to_string(),
-                        log::Level::Debug => "DEBUG".bright_blue().bold().to_string(),
-                        log::Level::Trace => "TRACE".bright_white().bold().to_string(),
-                    },
-                    // Only show the outer package name if verbose logging is enabled (otherwise nothing)
-                    match log_verbose {
-                        true => format!(" [{}]", record.target().split("::").nth(0).unwrap()),
-                        false => String::new(),
-                    }
-                    .bright_black()
-                ),
-                message
-            ))
-        })
-        .level(match args.verbose {
-            true => log::LevelFilter::Debug,
-            false => log::LevelFilter::Info,
-        })
-        .chain(std::io::stdout())
-        .apply()
-        .unwrap();
-    if args.verbose {
-        log::debug!("Verbose logging enabled");
-    }
+    enable_logger(args.verbose);
 
     // If the binary was built with profiling support, enable it
     #[cfg(feature = "enable-profiling")]

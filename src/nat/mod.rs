@@ -76,7 +76,7 @@ impl Nat64 {
             match self.interface.recv(&mut buffer) {
                 Ok(packet_len) => {
                     // Parse in to a more friendly format
-                    log::debug!("--- NEW PACKET ---");
+                    crate::debug!("--- NEW PACKET ---");
                     match IpPacket::new(&buffer[..packet_len]) {
                         // Try to process the packet
                         Ok(inbound_packet) => match self.process_packet(inbound_packet).await {
@@ -84,11 +84,11 @@ impl Nat64 {
                                 // If data is returned, send it back out the interface
                                 Some(outbound_packet) => {
                                     let packet_bytes = outbound_packet.to_bytes();
-                                    log::debug!(
+                                    crate::debug!(
                                         "Outbound packet next header: {}",
                                         outbound_packet.get_next_header().0
                                     );
-                                    log::debug!("Sending packet: {:?}", packet_bytes);
+                                    crate::debug!("Sending packet: {:?}", packet_bytes);
                                     self.interface.send(&packet_bytes).unwrap();
                                 }
                                 // Otherwise, we can assume that the packet was dealt with, and can move on
@@ -98,7 +98,7 @@ impl Nat64 {
                             // Some errors are non-critical as far as this loop is concerned
                             Err(error) => match error {
                                 Nat64Error::TableError(TableError::NoIpv6Mapping(address)) => {
-                                    log::debug!("No IPv6 mapping for {}", address);
+                                    crate::debug!("No IPv6 mapping for {}", address);
                                 }
                                 error => {
                                     return Err(error);
@@ -130,7 +130,7 @@ impl Nat64 {
             IpAddr::V4(ipv4_addr) => !self.table.is_address_within_pool(&ipv4_addr),
             IpAddr::V6(ipv6_addr) => !self.ipv6_nat_prefix.contains(&ipv6_addr),
         } {
-            log::debug!(
+            crate::debug!(
                 "Packet destination {} is not within the NAT64 prefix or IPv4 pool",
                 packet.get_destination(),
             );
@@ -148,12 +148,12 @@ impl Nat64 {
             .calculate_xlat_addr(&destination, &self.ipv6_nat_prefix)?;
 
         // Log information about the packet
-        log::debug!(
+        crate::debug!(
             "Received packet traveling from {} to {}",
             source,
             destination
         );
-        log::debug!(
+        crate::debug!(
             "New path shall become: {} -> {}",
             new_source,
             new_destination

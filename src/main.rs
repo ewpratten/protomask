@@ -60,7 +60,7 @@ pub async fn main() {
             .iter()
             .map(|rule| (rule.v6, rule.v4))
             .collect(),
-        config.rules.reservation_duration,
+        config.rules.reservation_duration(),
     )
     .await
     .unwrap();

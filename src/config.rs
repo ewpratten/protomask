@@ -10,12 +10,6 @@ use ipnet::{Ipv4Net, Ipv6Net};
 /// Interface config
 #[derive(Debug, serde::Deserialize)]
 pub struct InterfaceConfig {
-    /// IPv4 router address
-    // #[serde(rename = "Address4")]
-    // pub address_v4: Ipv4Addr,
-    // /// IPv6 router address
-    // #[serde(rename = "Address6")]
-    // pub address_v6: Ipv6Addr,
     /// Ipv4 pool
     #[serde(rename = "Pool")]
     pub pool: Vec<Ipv4Net>,
@@ -34,8 +28,8 @@ pub struct AddressMappingRule {
 }
 
 /// Used to generate the default reservation duration
-fn default_reservation_duration() -> Duration {
-    Duration::from_secs(7200)
+fn default_reservation_duration() -> u64 {
+    7200
 }
 
 /// Rules config
@@ -46,7 +40,14 @@ pub struct RulesConfig {
     pub static_map: Vec<AddressMappingRule>,
     /// How long to hold a dynamic mapping for
     #[serde(rename = "ReservationDuration", default="default_reservation_duration")]
-    pub reservation_duration: Duration,
+    reservation_duration: u64,
+}
+
+impl RulesConfig {
+    /// Get the reservation duration
+    pub fn reservation_duration(&self) -> Duration {
+        Duration::from_secs(self.reservation_duration)
+    }
 }
 
 /// Representation of the `protomask.toml` config file

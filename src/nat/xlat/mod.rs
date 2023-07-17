@@ -12,4 +12,6 @@ pub use udp::{translate_udp_4_to_6, translate_udp_6_to_4};
 pub enum PacketTranslationError {
     #[error("Input packet too short. Got {0} bytes")]
     InputPacketTooShort(usize),
+    #[error("Embedded packet too short. Got {0} bytes")]
+    EmbeddedPacketTooShort(usize),
 }

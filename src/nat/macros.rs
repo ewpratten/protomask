@@ -72,7 +72,7 @@ macro_rules! ipv6_packet {
 /// Quickly construct an IPv4 packet with the given parameters
 #[macro_export]
 macro_rules! ipv4_packet {
-    ($source:expr, $destination:expr, $ttl:expr, $next_level_protocol:expr, $payload:expr) => {
+    ($source:expr, $destination:expr, $next_level_protocol:expr, $ttl:expr, $payload:expr) => {
         ipv4_packet!(
             $source,
             $destination,
@@ -119,5 +119,45 @@ macro_rules! ipv4_packet {
         output.set_checksum(0);
         output.set_checksum(pnet_packet::ipv4::checksum(&output.to_immutable()));
         pnet_packet::ipv4::Ipv4Packet::owned(output.to_immutable().packet().to_vec()).unwrap()
+    }};
+}
+
+/// Quickly construct an ICMPv6 packet with the given parameters
+#[macro_export]
+macro_rules! icmpv6_packet {
+    ($source:expr, $destination:expr, $message_type:expr, $code:expr) => {
+        icmpv6_packet!($source, $destination, $message_type, $code, &[0u8; 0])
+    };
+    ($source:expr, $destination:expr, $message_type:expr, $code:expr, $payload:expr) => {{
+        let mut output =
+            pnet_packet::icmpv6::MutableIcmpv6Packet::owned(vec![0u8; 4 + $payload.len()]).unwrap();
+        output.set_icmpv6_type($message_type);
+        output.set_icmpv6_code($code);
+        output.set_payload($payload);
+        output.set_checksum(0);
+        output.set_checksum(pnet_packet::icmpv6::checksum(
+            &output.to_immutable(),
+            &$source,
+            &$destination,
+        ));
+        pnet_packet::icmpv6::Icmpv6Packet::owned(output.to_immutable().packet().to_vec()).unwrap()
+    }};
+}
+
+/// Quickly construct an ICMP packet with the given parameters
+#[macro_export]
+macro_rules! icmp_packet {
+    ($message_type:expr, $code:expr) => {
+        icmp_packet!($message_type, $code, &[0u8; 0])
+    };
+    ($message_type:expr, $code:expr, $payload:expr) => {{
+        let mut output =
+            pnet_packet::icmp::MutableIcmpPacket::owned(vec![0u8; 4 + $payload.len()]).unwrap();
+        output.set_icmp_type($message_type);
+        output.set_icmp_code($code);
+        output.set_payload($payload);
+        output.set_checksum(0);
+        output.set_checksum(pnet_packet::icmp::checksum(&output.to_immutable()));
+        pnet_packet::icmp::IcmpPacket::owned(output.to_immutable().packet().to_vec()).unwrap()
     }};
 }

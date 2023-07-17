@@ -7,7 +7,8 @@ use ipnet::{Ipv4Net, Ipv6Net};
 use pnet_packet::{ip::IpNextHeaderProtocols, Packet};
 
 use crate::{
-    into_icmp, into_tcp, into_udp, ipv4_packet, ipv6_packet, nat::xlat::translate_udp_4_to_6, into_icmpv6,
+    into_icmp, into_icmpv6, into_tcp, into_udp, ipv4_packet, ipv6_packet,
+    nat::xlat::translate_udp_4_to_6,
 };
 
 use self::{
@@ -75,10 +76,11 @@ impl Nat64 {
             match self.interface.recv(&mut buffer) {
                 Ok(packet_len) => {
                     // Parse in to a more friendly format
+                    log::debug!("--- NEW PACKET ---");
                     match IpPacket::new(&buffer[..packet_len]) {
                         // Try to process the packet
                         Ok(inbound_packet) => match self.process_packet(inbound_packet).await {
-                            Ok(inbound_packet) => match inbound_packet {
+                            Ok(outbound_packet) => match outbound_packet {
                                 // If data is returned, send it back out the interface
                                 Some(outbound_packet) => {
                                     let packet_bytes = outbound_packet.to_bytes();
@@ -168,7 +170,7 @@ impl Nat64 {
                         Some(icmp_packet) => Ok(Some(IpPacket::V6(ipv6_packet!(
                             new_source,
                             new_destination,
-                            IpNextHeaderProtocols::Icmp,
+                            IpNextHeaderProtocols::Icmpv6,
                             packet.get_ttl(),
                             icmp_packet.packet()
                         )))),
@@ -221,8 +223,8 @@ impl Nat64 {
                         Some(icmp_packet) => Ok(Some(IpPacket::V4(ipv4_packet!(
                             new_source,
                             new_destination,
-                            packet.get_hop_limit(),
                             IpNextHeaderProtocols::Icmp,
+                            packet.get_hop_limit(),
                             icmp_packet.packet()
                         )))),
                         None => Ok(None),
@@ -232,8 +234,8 @@ impl Nat64 {
                     IpNextHeaderProtocols::Udp => Ok(Some(IpPacket::V4(ipv4_packet!(
                         new_source,
                         new_destination,
-                        packet.get_hop_limit(),
                         IpNextHeaderProtocols::Udp,
+                        packet.get_hop_limit(),
                         xlat::translate_udp_6_to_4(
                             into_udp!(packet.payload().to_vec())?,
                             new_source,
@@ -246,8 +248,8 @@ impl Nat64 {
                     IpNextHeaderProtocols::Tcp => Ok(Some(IpPacket::V4(ipv4_packet!(
                         new_source,
                         new_destination,
-                        packet.get_hop_limit(),
                         IpNextHeaderProtocols::Tcp,
+                        packet.get_hop_limit(),
                         xlat::translate_tcp_6_to_4(
                             into_tcp!(packet.payload().to_vec())?,
                             new_source,
@@ -267,20 +269,5 @@ impl Nat64 {
             // Honestly, this should probably be `unreachable!()`
             _ => unimplemented!(),
         }
-        // match next_header_protocol {
-        //     IpNextHeaderProtocols::Icmp | IpNextHeaderProtocols::Icmpv6 => Ok(
-        //         xlat::proxy_icmp_packet(packet, new_source, new_destination)?,
-        //     ),
-        //     IpNextHeaderProtocols::Udp => Ok(Some(
-        //         xlat::proxy_udp_packet(packet, new_source, new_destination).await?,
-        //     )),
-        //     IpNextHeaderProtocols::Tcp => Ok(Some(
-        //         xlat::proxy_tcp_packet(packet, new_source, new_destination).await?,
-        //     )),
-        //     next_header_protocol => {
-        //         log::warn!("Unsupported next header protocol: {}", next_header_protocol);
-        //         Ok(None)
-        //     }
-        // }
     }
 }

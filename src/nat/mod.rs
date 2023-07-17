@@ -6,7 +6,7 @@ use std::{
 use ipnet::{Ipv4Net, Ipv6Net};
 use pnet_packet::{ip::IpNextHeaderProtocols, Packet};
 
-use crate::{into_udp, ipv4_packet, ipv6_packet, nat::xlat::translate_udp_4_to_6};
+use crate::{into_tcp, into_udp, ipv4_packet, ipv6_packet, nat::xlat::translate_udp_4_to_6};
 
 use self::{
     interface::Nat64Interface,
@@ -171,6 +171,20 @@ impl Nat64 {
                         .packet()
                     )))),
 
+                    // Transmission Control Protocol
+                    IpNextHeaderProtocols::Tcp => Ok(Some(IpPacket::V6(ipv6_packet!(
+                        new_source,
+                        new_destination,
+                        IpNextHeaderProtocols::Tcp,
+                        packet.get_ttl(),
+                        xlat::translate_tcp_4_to_6(
+                            into_tcp!(packet.payload().to_vec())?,
+                            new_source,
+                            new_destination
+                        )?
+                        .packet()
+                    )))),
+
                     // For any protocol we don't support, just warn and drop the packet
                     next_level_protocol => {
                         log::warn!("Unsupported next level protocol: {}", next_level_protocol);
@@ -188,6 +202,20 @@ impl Nat64 {
                         IpNextHeaderProtocols::Udp,
                         xlat::translate_udp_6_to_4(
                             into_udp!(packet.payload().to_vec())?,
+                            new_source,
+                            new_destination
+                        )?
+                        .packet()
+                    )))),
+
+                    // Transmission Control Protocol
+                    IpNextHeaderProtocols::Tcp => Ok(Some(IpPacket::V4(ipv4_packet!(
+                        new_source,
+                        new_destination,
+                        packet.get_hop_limit(),
+                        IpNextHeaderProtocols::Tcp,
+                        xlat::translate_tcp_6_to_4(
+                            into_tcp!(packet.payload().to_vec())?,
                             new_source,
                             new_destination
                         )?

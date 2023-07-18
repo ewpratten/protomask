@@ -63,6 +63,7 @@ impl Nat64Table {
         // Add the reservation
         self.reservations.insert(ipv6, ipv4);
         self.reservation_times.insert((ipv6, ipv4), None);
+        log::info!("Added infinite reservation: {} -> {}", ipv6, ipv4);
         Ok(())
     }
 
@@ -91,6 +92,7 @@ impl Nat64Table {
                     self.reservations.insert(ipv6, ipv4);
                     self.reservation_times
                         .insert((ipv6, ipv4), Some(Instant::now()));
+                    log::info!("Assigned new reservation: {} -> {}", ipv6, ipv4);
                     return Ok(ipv4);
                 }
             }
@@ -187,7 +189,11 @@ impl Nat64Table {
         self.reservations.retain(|v6, v4| {
             if let Some(time) = self.reservation_times.get(&(*v6, *v4)) {
                 if let Some(time) = time {
-                    now - *time < self.reservation_timeout
+                    let keep = now - *time < self.reservation_timeout;
+                    if !keep {
+                        log::info!("Pruned reservation: {} -> {}", v6, v4);
+                    }
+                    keep
                 } else {
                     true
                 }

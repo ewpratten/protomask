@@ -44,3 +44,80 @@ pub fn translate_tcp6_to_tcp4(
         input.payload,
     )?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_translate_tcp4_to_tcp6() {
+        let input = TcpPacket::new(
+            "192.0.2.1:1234".parse().unwrap(),
+            "192.0.2.2:5678".parse().unwrap(),
+            123456,
+            654321,
+            0,
+            4096,
+            0,
+            Vec::new(),
+            RawBytes("Hello, world!".as_bytes().to_vec()),
+        )
+        .unwrap();
+
+        let result = translate_tcp4_to_tcp6(
+            input,
+            "2001:db8::1".parse().unwrap(),
+            "2001:db8::2".parse().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(result.source(), "[2001:db8::1]:1234".parse().unwrap());
+        assert_eq!(result.destination(), "[2001:db8::2]:5678".parse().unwrap());
+        assert_eq!(result.sequence, 123456);
+        assert_eq!(result.ack_number, 654321);
+        assert_eq!(result.flags, 0);
+        assert_eq!(result.window_size, 4096);
+        assert_eq!(result.urgent_pointer, 0);
+        assert_eq!(result.options.len(), 0);
+        assert_eq!(
+            result.payload,
+            RawBytes("Hello, world!".as_bytes().to_vec())
+        );
+    }
+
+    #[test]
+    fn test_translate_tcp6_to_tcp4() {
+        let input = TcpPacket::new(
+            "[2001:db8::1]:1234".parse().unwrap(),
+            "[2001:db8::2]:5678".parse().unwrap(),
+            123456,
+            654321,
+            0,
+            4096,
+            0,
+            Vec::new(),
+            RawBytes("Hello, world!".as_bytes().to_vec()),
+        )
+        .unwrap();
+
+        let result = translate_tcp6_to_tcp4(
+            input,
+            "192.0.2.1".parse().unwrap(),
+            "192.0.2.2".parse().unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(result.source(), "192.0.2.1:1234".parse().unwrap());
+        assert_eq!(result.destination(), "192.0.2.2:5678".parse().unwrap());
+        assert_eq!(result.sequence, 123456);
+        assert_eq!(result.ack_number, 654321);
+        assert_eq!(result.flags, 0);
+        assert_eq!(result.window_size, 4096);
+        assert_eq!(result.urgent_pointer, 0);
+        assert_eq!(result.options.len(), 0);
+        assert_eq!(
+            result.payload,
+            RawBytes("Hello, world!".as_bytes().to_vec())
+        );
+    }
+}

@@ -31,7 +31,11 @@ impl TunDevice {
     /// it will be replaced with a unique number.
     pub async fn new(name: &str) -> Result<Self> {
         // Bring up an rtnetlink connection
-        let (rt_connection, rt_handle, _) = rtnetlink::new_connection()?;
+        let (rt_connection, rt_handle, _) = rtnetlink::new_connection().map_err(|err| {
+            log::error!("Failed to open rtnetlink connection");
+            log::error!("{}", err);
+            err
+        })?;
         tokio::spawn(rt_connection);
 
         // Create the TUN device
@@ -55,7 +59,12 @@ impl TunDevice {
             .set(tun_link.header.index)
             .up()
             .execute()
-            .await?;
+            .await
+            .map_err(|err| {
+                log::error!("Failed to bring up link");
+                log::error!("{}", err);
+                err
+            })?;
         log::debug!("Brought {} up", tun_device.name());
 
         // Read the link MTU
@@ -81,7 +90,12 @@ impl TunDevice {
             .address()
             .add(self.link_index, ip_address, prefix_len)
             .execute()
-            .await?;
+            .await
+            .map_err(|err| {
+                log::error!("Failed to add address {} to link", ip_address);
+                log::error!("{}", err);
+                err
+            })?;
 
         Ok(())
     }
@@ -98,14 +112,24 @@ impl TunDevice {
             .set_prefix_length_filter(prefix_len)
             .execute()
             .try_next()
-            .await?
+            .await
+            .map_err(|err| {
+                log::error!("Failed to find address {} on link", ip_address);
+                log::error!("{}", err);
+                err
+            })?
         {
             // Delete the address
             self.rt_handle
                 .address()
                 .del(address_message)
                 .execute()
-                .await?;
+                .await
+                .map_err(|err| {
+                    log::error!("Failed to remove address {} from link", ip_address);
+                    log::error!("{}", err);
+                    err
+                })?;
         }
 
         Ok(())
@@ -119,18 +143,30 @@ impl TunDevice {
                     .route()
                     .add()
                     .v4()
+                    .output_interface(self.link_index)
                     .destination_prefix(destination.addr(), destination.prefix_len())
                     .execute()
-                    .await?;
+                    .await
+                    .map_err(|err| {
+                        log::error!("Failed to add route {} to link", destination);
+                        log::error!("{}", err);
+                        err
+                    })?;
             }
             IpNet::V6(destination) => {
                 self.rt_handle
                     .route()
                     .add()
                     .v6()
+                    .output_interface(self.link_index)
                     .destination_prefix(destination.addr(), destination.prefix_len())
                     .execute()
-                    .await?;
+                    .await
+                    .map_err(|err| {
+                        log::error!("Failed to add route {} to link", destination);
+                        log::error!("{}", err);
+                        err
+                    })?;
             }
         }
 
@@ -140,10 +176,10 @@ impl TunDevice {
     /// Spawns worker threads, and returns a tx/rx pair for the caller to interact with them
     pub async fn spawn_worker(&self) -> (mpsc::Sender<Vec<u8>>, broadcast::Receiver<Vec<u8>>) {
         // Create a channel for packets to be sent to the caller
-        let (tx_to_caller, rx_from_worker) = broadcast::channel(32);
+        let (tx_to_caller, rx_from_worker) = broadcast::channel(65535);
 
         // Create a channel for packets being received from the caller
-        let (tx_to_worker, mut rx_from_caller) = mpsc::channel(32);
+        let (tx_to_worker, mut rx_from_caller) = mpsc::channel(65535);
 
         // Clone some values for use in worker threads
         let mtu = self.mtu;

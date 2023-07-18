@@ -82,52 +82,67 @@ impl Nat64 {
         // Process packets in a loop
         loop {
             // Try to read a packet
-            let packet = rx.recv().await?;
+            match rx.recv().await {
+                Ok(packet) => {
+                    // Clone the TX so the worker can respond with data
+                    let tx = tx.clone();
 
-            // Clone the TX so the worker can respond with data
-            let tx = tx.clone();
+                    // Separate logic is needed for handling IPv4 vs IPv6 packets, so a check must be done here
+                    match packet[0] >> 4 {
+                        4 => {
+                            // Parse the packet
+                            let packet: Ipv4Packet<Vec<u8>> = packet.try_into()?;
 
-            // Separate logic is needed for handling IPv4 vs IPv6 packets, so a check must be done here
-            match packet[0] >> 4 {
-                4 => {
-                    // Parse the packet
-                    let packet: Ipv4Packet<Vec<u8>> = packet.try_into()?;
+                            // Drop packets that aren't destined for a destination the table knows about
+                            if !self.table.contains(&IpAddr::V4(packet.destination_address)) {
+                                continue;
+                            }
 
-                    // Drop packets that aren't destined for a destination the table knows about
-                    if !self.table.contains(&IpAddr::V4(packet.destination_address)) {
-                        continue;
+                            // Get the new source and dest addresses
+                            let new_source =
+                                embed_address(packet.source_address, self.ipv6_nat_prefix);
+                            let new_destination =
+                                self.table.get_reverse(packet.destination_address)?;
+
+                            // Spawn a task to process the packet
+                            tokio::spawn(async move {
+                                let output =
+                                    translate_ipv4_to_ipv6(packet, new_source, new_destination)
+                                        .unwrap();
+                                tx.send(output.into()).await.unwrap();
+                            });
+                        }
+                        6 => {
+                            // Parse the packet
+                            let packet: Ipv6Packet<Vec<u8>> = packet.try_into()?;
+
+                            // Get the new source and dest addresses
+                            let new_source =
+                                self.table.get_or_assign_ipv4(packet.source_address)?;
+                            let new_destination = extract_address(packet.destination_address);
+
+                            // Spawn a task to process the packet
+                            tokio::spawn(async move {
+                                let output =
+                                    translate_ipv6_to_ipv4(packet, new_source, new_destination)
+                                        .unwrap();
+                                tx.send(output.into()).await.unwrap();
+                            });
+                        }
+                        n => {
+                            log::warn!("Unknown IP version: {}", n);
+                        }
                     }
-
-                    // Get the new source and dest addresses
-                    let new_source = embed_address(packet.source_address, self.ipv6_nat_prefix);
-                    let new_destination = self.table.get_reverse(packet.destination_address)?;
-
-                    // Spawn a task to process the packet
-                    tokio::spawn(async move {
-                        let output =
-                            translate_ipv4_to_ipv6(packet, new_source, new_destination).unwrap();
-                        tx.send(output.into()).await.unwrap();
-                    });
+                    Ok(())
                 }
-                6 => {
-                    // Parse the packet
-                    let packet: Ipv6Packet<Vec<u8>> = packet.try_into()?;
-
-                    // Get the new source and dest addresses
-                    let new_source = self.table.get_or_assign_ipv4(packet.source_address)?;
-                    let new_destination = extract_address(packet.destination_address);
-
-                    // Spawn a task to process the packet
-                    tokio::spawn(async move {
-                        let output =
-                            translate_ipv6_to_ipv4(packet, new_source, new_destination).unwrap();
-                        tx.send(output.into()).await.unwrap();
-                    });
-                }
-                n => {
-                    log::warn!("Unknown IP version: {}", n);
-                }
-            }
+                Err(error) => match error {
+                    broadcast::error::RecvError::Lagged(count) => {
+                        log::warn!("Translator running behind! Dropping {} packets", count);
+                        Ok(())
+                    }
+                    error => Err(error),
+                },
+            }?;
         }
     }
 }

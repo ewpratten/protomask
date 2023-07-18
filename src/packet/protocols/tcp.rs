@@ -100,12 +100,11 @@ impl<T> TcpPacket<T> {
     }
 
     /// Get the length of the options in words
-    fn options_length_words(&self) -> u8 {
+    fn options_length(&self) -> usize {
         self.options
             .iter()
-            .map(|option| TcpOptionPacket::packet_size(option) as u8)
-            .sum::<u8>()
-            / 4
+            .map(|option| TcpOptionPacket::packet_size(option))
+            .sum::<usize>()
     }
 }
 
@@ -182,18 +181,18 @@ impl TcpPacket<RawBytes> {
 
 impl<T> Into<Vec<u8>> for TcpPacket<T>
 where
-    T: Into<Vec<u8>> ,
+    T: Into<Vec<u8>>,
 {
     fn into(self) -> Vec<u8> {
         // Get the options length in words
-        let options_length_words = self.options_length_words();
+        let options_length = self.options_length();
 
         // Convert the payload into raw bytes
         let payload: Vec<u8> = self.payload.into();
 
         // Allocate a mutable packet to write into
         let total_length = pnet_packet::tcp::MutableTcpPacket::minimum_packet_size()
-            + (options_length_words as usize * 4)
+            + options_length
             + payload.len();
         let mut output =
             pnet_packet::tcp::MutableTcpPacket::owned(vec![0u8; total_length]).unwrap();
@@ -206,11 +205,11 @@ where
         output.set_sequence(self.sequence);
         output.set_acknowledgement(self.ack_number);
 
+        // Write the offset
+        output.set_data_offset(5 + (options_length / 4) as u8);
+
         // Write the options
         output.set_options(&self.options);
-
-        // Write the offset
-        output.set_data_offset(5 + options_length_words);
 
         // Write the flags
         output.set_flags(self.flags.into());

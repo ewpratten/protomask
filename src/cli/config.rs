@@ -1,3 +1,5 @@
+//! Serde definitions for the config file
+
 use std::{
     net::{Ipv4Addr, Ipv6Addr},
     path::Path,
@@ -65,6 +67,7 @@ impl Config {
         // Parse
         match serde_path_to_error::deserialize(deserializer) {
             Ok(config) => Ok(config),
+            // If there is a parsing error, display a reasonable error message
             Err(e) => {
                 eprintln!(
                     "Failed to parse config file due to:\n {}\n at {}",

@@ -144,7 +144,7 @@ pub fn translate_icmp_4_to_6(
 
             // if the original payload's next header is ICMP, we need to translated the inner payload's ICMP type
             if original_payload.get_next_level_protocol() == IpNextHeaderProtocols::Icmp {
-                crate::debug!("Time Exceeded packet contains another ICMP packet.. Translating");
+                log::debug!("Time Exceeded packet contains another ICMP packet.. Translating");
                 if let Some((icmpv6_type, icmpv6_code)) = translate_type_and_code_4_to_6(
                     IcmpType(original_payload_inner[0]),
                     IcmpCode(original_payload_inner[1]),
@@ -157,7 +157,7 @@ pub fn translate_icmp_4_to_6(
                         &original_payload_inner[4..]
                     );
                     original_payload_inner = inner_icmpv6.packet().to_vec();
-                    crate::debug!(
+                    log::debug!(
                         "Translated inner ICMPv6 packet: {:?}",
                         original_payload_inner
                     );
@@ -194,7 +194,7 @@ pub fn translate_icmp_4_to_6(
         output.set_icmpv6_code(icmpv6_code);
 
         // Set the payload
-        crate::debug!("Setting ICMPv6 payload: {:?}", output_payload);
+        log::debug!("Setting ICMPv6 payload: {:?}", output_payload);
         output.set_payload(&output_payload);
 
         // Calculate the checksum
@@ -256,7 +256,7 @@ pub fn translate_icmp_6_to_4(
 
             // if the original payload's next header is ICMPv6, we need to translated the inner payload's ICMPv6 type
             if original_payload.get_next_header() == IpNextHeaderProtocols::Icmpv6 {
-                crate::debug!("Time Exceeded packet contains another ICMPv6 packet.. Translating");
+                log::debug!("Time Exceeded packet contains another ICMPv6 packet.. Translating");
                 if let Some((icmp_type, icmp_code)) = translate_type_and_code_6_to_4(
                     Icmpv6Type(original_payload_inner[0]),
                     Icmpv6Code(original_payload_inner[1]),
@@ -264,7 +264,7 @@ pub fn translate_icmp_6_to_4(
                     let inner_icmp =
                         icmp_packet!(icmp_type, icmp_code, &original_payload_inner[8..]);
                     original_payload_inner = inner_icmp.packet().to_vec();
-                    crate::debug!("Translated inner ICMP packet: {:?}", original_payload_inner);
+                    log::debug!("Translated inner ICMP packet: {:?}", original_payload_inner);
                 }
             }
 

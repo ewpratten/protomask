@@ -1,11 +1,12 @@
+//! This is the entrypoint for `protomask` from the command line.
+
 use clap::Parser;
 use config::Config;
 use logging::enable_logger;
-use nat::Nat64;
+use protomask::nat::Nat64;
 
 mod cli;
 mod config;
-mod nat;
 mod logging;
 
 #[tokio::main]
@@ -15,16 +16,6 @@ pub async fn main() {
 
     // Set up logging
     enable_logger(args.verbose);
-
-    // If the binary was built with profiling support, enable it
-    #[cfg(feature = "enable-profiling")]
-    let _puffin_server: puffin_http::Server;
-    #[cfg(feature = "enable-profiling")]
-    if args.enable_profiling {
-        _puffin_server =
-            puffin_http::Server::new(&format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT)).unwrap();
-        log::info!("Puffin profiling server started");
-    }
 
     // Parse the config file
     let config = Config::load(args.config_file).unwrap();

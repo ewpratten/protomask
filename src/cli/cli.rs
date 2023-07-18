@@ -1,3 +1,5 @@
+//! Command line argument definitions
+
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -11,9 +13,4 @@ pub struct Args {
     /// Enable verbose logging
     #[clap(short, long)]
     pub verbose: bool,
-
-    /// Enable the puffin profiling server for debugging
-    #[cfg(feature = "enable-profiling")]
-    #[clap(long)]
-    pub enable_profiling: bool,
 }

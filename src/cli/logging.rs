@@ -1,19 +1,4 @@
-use std::sync::OnceLock;
-
 use colored::Colorize;
-
-/// A global variable that is used to early-kill attempts to write debug logs if debug logging is disabled
-pub static DEBUG_ENABLED: OnceLock<bool> = OnceLock::new();
-
-/// A macro that can completely skip the debug step if debug logging is disabled
-#[macro_export]
-macro_rules! debug {
-    ($($arg:tt)*) => {
-        if *$crate::logging::DEBUG_ENABLED.get().unwrap_or(&false) {
-            log::debug!($($arg)*);
-        }
-    };
-}
 
 /// Enable the logger
 #[allow(dead_code)]
@@ -42,17 +27,13 @@ pub fn enable_logger(verbose: bool) {
                 message
             ))
         })
+        // Set the correct log level based on CLI flags
         .level(match verbose {
             true => log::LevelFilter::Debug,
             false => log::LevelFilter::Info,
         })
+        // Output to STDOUT
         .chain(std::io::stdout())
         .apply()
         .unwrap();
-    if verbose {
-        log::debug!("Verbose logging enabled");
-    }
-
-    // Set the global debug enabled variable
-    DEBUG_ENABLED.set(verbose).unwrap();
 }

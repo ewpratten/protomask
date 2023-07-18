@@ -1,21 +1,20 @@
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    time::Duration,
+use self::{
+    // interface::Nat64Interface,
+    packet::IpPacket,
+    table::{Nat64Table, TableError},
 };
-
-use ipnet::{Ipv4Net, Ipv6Net};
-use pnet_packet::{ip::IpNextHeaderProtocols, Packet};
-
 use crate::{
     into_icmp, into_icmpv6, into_tcp, into_udp, ipv4_packet, ipv6_packet,
     nat::xlat::translate_udp_4_to_6,
 };
-
-use self::{
-    interface::Nat64Interface,
-    packet::IpPacket,
-    table::{Nat64Table, TableError},
+use ipnet::{Ipv4Net, Ipv6Net};
+use pnet_packet::{ip::IpNextHeaderProtocols, Packet};
+use protomask_tun::TunDevice;
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    time::Duration,
 };
+use tokio::sync::{broadcast, mpsc};
 
 mod interface;
 mod macros;
@@ -28,16 +27,18 @@ pub enum Nat64Error {
     #[error(transparent)]
     TableError(#[from] table::TableError),
     #[error(transparent)]
-    InterfaceError(#[from] interface::InterfaceError),
+    TunError(#[from] protomask_tun::Error),
     #[error(transparent)]
     IoError(#[from] std::io::Error),
     #[error(transparent)]
     XlatError(#[from] xlat::PacketTranslationError),
+    #[error(transparent)]
+    PacketReceiveError(#[from] broadcast::error::RecvError),
 }
 
 pub struct Nat64 {
     table: Nat64Table,
-    interface: Nat64Interface,
+    interface: TunDevice,
     ipv6_nat_prefix: Ipv6Net,
 }
 
@@ -50,7 +51,15 @@ impl Nat64 {
         reservation_duration: Duration,
     ) -> Result<Self, Nat64Error> {
         // Bring up the interface
-        let interface = Nat64Interface::new(ipv6_nat_prefix, &ipv4_pool).await?;
+        let mut interface = TunDevice::new("nat64i%d").await?;
+
+        // Add the NAT64 prefix as a route
+        interface.add_route(ipv6_nat_prefix.into()).await?;
+
+        // Add the IPv4 pool prefixes as routes
+        for ipv4_prefix in ipv4_pool.iter() {
+            interface.add_route((*ipv4_prefix).into()).await?;
+        }
 
         // Build the table and insert any static reservations
         let mut table = Nat64Table::new(ipv4_pool, reservation_duration);
@@ -67,60 +76,78 @@ impl Nat64 {
 
     /// Block and process all packets
     pub async fn run(&mut self) -> Result<(), Nat64Error> {
-        // Allocate a buffer for incoming packets
-        let mut buffer = vec![0u8; self.interface.mtu()];
+        // Get an rx/tx pair for the interface
+        let (tx, mut rx) = self.interface.spawn_worker().await;
 
-        // Loop forever
+        // Process packets in a loop
         loop {
-            // Read a packet from the interface
-            match self.interface.recv(&mut buffer) {
-                Ok(packet_len) => {
-                    // Parse in to a more friendly format
-                    crate::debug!("--- NEW PACKET ---");
-                    match IpPacket::new(&buffer[..packet_len]) {
-                        // Try to process the packet
-                        Ok(inbound_packet) => match self.process_packet(inbound_packet).await {
-                            Ok(outbound_packet) => match outbound_packet {
-                                // If data is returned, send it back out the interface
-                                Some(outbound_packet) => {
-                                    let packet_bytes = outbound_packet.to_bytes();
-                                    crate::debug!(
-                                        "Outbound packet next header: {}",
-                                        outbound_packet.get_next_header().0
-                                    );
-                                    crate::debug!("Sending packet: {:?}", packet_bytes);
-                                    self.interface.send(&packet_bytes).unwrap();
-                                }
-                                // Otherwise, we can assume that the packet was dealt with, and can move on
-                                None => {}
-                            },
+            // Try to read a packet
+            let packet = rx.recv().await?;
 
-                            // Some errors are non-critical as far as this loop is concerned
-                            Err(error) => match error {
-                                Nat64Error::TableError(TableError::NoIpv6Mapping(address)) => {
-                                    crate::debug!("No IPv6 mapping for {}", address);
-                                }
-                                error => {
-                                    return Err(error);
-                                }
-                            },
-                        },
-                        Err(error) => {
-                            log::error!("Failed to parse packet: {}", error);
-                        }
-                    }
-                }
-                Err(error) => {
-                    log::error!("Failed to read packet: {}", error);
-                }
-            }
+
+
+            // Spawn a task to process the packet
+            let mut tx = tx.clone();
+            tokio::spawn(async move{
+
+
+            });
         }
+
+        Ok(())
+        // // Allocate a buffer for incoming packets
+        // let mut buffer = vec![0u8; self.interface.mtu()];
+
+        // // Loop forever
+        // loop {
+        //     // Read a packet from the interface
+        //     match self.interface.recv(&mut buffer) {
+        //         Ok(packet_len) => {
+        //             // Parse in to a more friendly format
+        //             log::debug!("--- NEW PACKET ---");
+        //             match IpPacket::new(&buffer[..packet_len]) {
+        //                 // Try to process the packet
+        //                 Ok(inbound_packet) => match self.process_packet(inbound_packet).await {
+        //                     Ok(outbound_packet) => match outbound_packet {
+        //                         // If data is returned, send it back out the interface
+        //                         Some(outbound_packet) => {
+        //                             let packet_bytes = outbound_packet.to_bytes();
+        //                             log::debug!(
+        //                                 "Outbound packet next header: {}",
+        //                                 outbound_packet.get_next_header().0
+        //                             );
+        //                             log::debug!("Sending packet: {:?}", packet_bytes);
+        //                             self.interface.send(&packet_bytes).unwrap();
+        //                         }
+        //                         // Otherwise, we can assume that the packet was dealt with, and can move on
+        //                         None => {}
+        //                     },
+
+        //                     // Some errors are non-critical as far as this loop is concerned
+        //                     Err(error) => match error {
+        //                         Nat64Error::TableError(TableError::NoIpv6Mapping(address)) => {
+        //                             log::debug!("No IPv6 mapping for {}", address);
+        //                         }
+        //                         error => {
+        //                             return Err(error);
+        //                         }
+        //                     },
+        //                 },
+        //                 Err(error) => {
+        //                     log::error!("Failed to parse packet: {}", error);
+        //                 }
+        //             }
+        //         }
+        //         Err(error) => {
+        //             log::error!("Failed to read packet: {}", error);
+        //         }
+        //     }
+        // }
     }
 }
 
 impl Nat64 {
-
-    #[profiling::function]
+    
     async fn process_packet<'a>(
         &mut self,
         packet: IpPacket<'a>,
@@ -130,7 +157,7 @@ impl Nat64 {
             IpAddr::V4(ipv4_addr) => !self.table.is_address_within_pool(&ipv4_addr),
             IpAddr::V6(ipv6_addr) => !self.ipv6_nat_prefix.contains(&ipv6_addr),
         } {
-            crate::debug!(
+            log::debug!(
                 "Packet destination {} is not within the NAT64 prefix or IPv4 pool",
                 packet.get_destination(),
             );
@@ -148,12 +175,12 @@ impl Nat64 {
             .calculate_xlat_addr(&destination, &self.ipv6_nat_prefix)?;
 
         // Log information about the packet
-        crate::debug!(
+        log::debug!(
             "Received packet traveling from {} to {}",
             source,
             destination
         );
-        crate::debug!(
+        log::debug!(
             "New path shall become: {} -> {}",
             new_source,
             new_destination

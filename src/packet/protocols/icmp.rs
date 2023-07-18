@@ -23,37 +23,22 @@ impl<T> IcmpPacket<T> {
     }
 }
 
-impl<T> IcmpPacket<T>
+impl<T> TryFrom<Vec<u8>> for IcmpPacket<T>
 where
-    T: From<Vec<u8>>,
+    T: TryFrom<Vec<u8>, Error = PacketError>,
 {
-    /// Construct a new ICMPv6 packet from raw bytes
-    pub fn new_from_bytes(bytes: &[u8]) -> Result<Self, PacketError> {
+    type Error = PacketError;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
         let packet =
-            pnet_packet::icmp::IcmpPacket::new(bytes).ok_or(PacketError::TooShort(bytes.len()))?;
+            pnet_packet::icmp::IcmpPacket::new(&bytes).ok_or(PacketError::TooShort(bytes.len()))?;
 
         // Return the packet
         Ok(Self {
             icmp_type: packet.get_icmp_type(),
             icmp_code: packet.get_icmp_code(),
-            payload: packet.payload().to_vec().into(),
-        })
-    }
-}
-
-impl IcmpPacket<Vec<u8>> {
-    /// Construct a new ICMPv6 packet with a raw payload from raw bytes
-    pub fn new_from_bytes_raw_payload(bytes: &[u8]) -> Result<Self, PacketError> {
-        // Parse the packet
-        let packet =
-            pnet_packet::icmp::IcmpPacket::new(bytes).ok_or(PacketError::TooShort(bytes.len()))?;
-
-        // Return the packet
-        Ok(Self {
-            icmp_type: packet.get_icmp_type(),
-            icmp_code: packet.get_icmp_code(),
-            payload: packet.payload().to_vec(),
+            payload: packet.payload().to_vec().try_into()?,
         })
     }
 }

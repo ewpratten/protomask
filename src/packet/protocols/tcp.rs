@@ -188,8 +188,9 @@ where
         let payload: Vec<u8> = self.payload.into();
 
         // Allocate a mutable packet to write into
-        let total_length =
-            pnet_packet::tcp::MutableTcpPacket::minimum_packet_size() + payload.len();
+        let total_length = pnet_packet::tcp::MutableTcpPacket::minimum_packet_size()
+            + (self.options_length_words() as usize * 4)
+            + payload.len();
         let mut output =
             pnet_packet::tcp::MutableTcpPacket::owned(vec![0u8; total_length]).unwrap();
 

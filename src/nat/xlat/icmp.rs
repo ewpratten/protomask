@@ -15,108 +15,108 @@ use crate::{icmp_packet, icmpv6_packet, ipv4_packet, ipv6_packet};
 
 use super::PacketTranslationError;
 
-/// Best effort translation from an ICMP type and code to an ICMPv6 type and code
-fn translate_type_and_code_4_to_6(
-    icmp_type: IcmpType,
-    icmp_code: IcmpCode,
-) -> Option<(Icmpv6Type, Icmpv6Code)> {
-    match (icmp_type, icmp_code) {
-        // Echo Request
-        (IcmpTypes::EchoRequest, _) => Some((Icmpv6Types::EchoRequest, Icmpv6Code(0))),
+// /// Best effort translation from an ICMP type and code to an ICMPv6 type and code
+// fn translate_type_and_code_4_to_6(
+//     icmp_type: IcmpType,
+//     icmp_code: IcmpCode,
+// ) -> Option<(Icmpv6Type, Icmpv6Code)> {
+//     match (icmp_type, icmp_code) {
+//         // Echo Request
+//         (IcmpTypes::EchoRequest, _) => Some((Icmpv6Types::EchoRequest, Icmpv6Code(0))),
 
-        // Echo Reply
-        (IcmpTypes::EchoReply, _) => Some((Icmpv6Types::EchoReply, Icmpv6Code(0))),
+//         // Echo Reply
+//         (IcmpTypes::EchoReply, _) => Some((Icmpv6Types::EchoReply, Icmpv6Code(0))),
 
-        // Packet Too Big
-        (
-            IcmpTypes::DestinationUnreachable,
-            destination_unreachable::IcmpCodes::FragmentationRequiredAndDFFlagSet,
-        ) => Some((Icmpv6Types::PacketTooBig, Icmpv6Code(0))),
+//         // Packet Too Big
+//         (
+//             IcmpTypes::DestinationUnreachable,
+//             destination_unreachable::IcmpCodes::FragmentationRequiredAndDFFlagSet,
+//         ) => Some((Icmpv6Types::PacketTooBig, Icmpv6Code(0))),
 
-        // Destination Unreachable
-        (IcmpTypes::DestinationUnreachable, icmp_code) => Some((
-            Icmpv6Types::DestinationUnreachable,
-            #[cfg_attr(rustfmt, rustfmt_skip)]
-            Icmpv6Code(match icmp_code {
-                destination_unreachable::IcmpCodes::DestinationHostUnreachable => 3,
-                destination_unreachable::IcmpCodes::DestinationProtocolUnreachable => 4,
-                destination_unreachable::IcmpCodes::DestinationPortUnreachable => 4,
-                destination_unreachable::IcmpCodes::SourceRouteFailed => 5,
-                destination_unreachable::IcmpCodes::SourceHostIsolated => 2,
-                destination_unreachable::IcmpCodes::NetworkAdministrativelyProhibited => 1,
-                destination_unreachable::IcmpCodes::HostAdministrativelyProhibited => 1,
-                destination_unreachable::IcmpCodes::CommunicationAdministrativelyProhibited => 1,
+//         // Destination Unreachable
+//         (IcmpTypes::DestinationUnreachable, icmp_code) => Some((
+//             Icmpv6Types::DestinationUnreachable,
+//             #[cfg_attr(rustfmt, rustfmt_skip)]
+//             Icmpv6Code(match icmp_code {
+//                 destination_unreachable::IcmpCodes::DestinationHostUnreachable => 3,
+//                 destination_unreachable::IcmpCodes::DestinationProtocolUnreachable => 4,
+//                 destination_unreachable::IcmpCodes::DestinationPortUnreachable => 4,
+//                 destination_unreachable::IcmpCodes::SourceRouteFailed => 5,
+//                 destination_unreachable::IcmpCodes::SourceHostIsolated => 2,
+//                 destination_unreachable::IcmpCodes::NetworkAdministrativelyProhibited => 1,
+//                 destination_unreachable::IcmpCodes::HostAdministrativelyProhibited => 1,
+//                 destination_unreachable::IcmpCodes::CommunicationAdministrativelyProhibited => 1,
 
-                // Default to No Route to Destination
-                _ => 0,
-            }),
-        )),
+//                 // Default to No Route to Destination
+//                 _ => 0,
+//             }),
+//         )),
 
-        // Time Exceeded
-        (IcmpTypes::TimeExceeded, icmp_code) => {
-            Some((Icmpv6Types::TimeExceeded, Icmpv6Code(icmp_code.0)))
-        }
+//         // Time Exceeded
+//         (IcmpTypes::TimeExceeded, icmp_code) => {
+//             Some((Icmpv6Types::TimeExceeded, Icmpv6Code(icmp_code.0)))
+//         }
 
-        // Default unsupported
-        _ => {
-            log::warn!(
-                "Unsupported ICMP code and type: {:?}, {:?}",
-                icmp_type,
-                icmp_code
-            );
-            None
-        }
-    }
-}
+//         // Default unsupported
+//         _ => {
+//             log::warn!(
+//                 "Unsupported ICMP code and type: {:?}, {:?}",
+//                 icmp_type,
+//                 icmp_code
+//             );
+//             None
+//         }
+//     }
+// }
 
-/// Best effort translation from an ICMPv6 type and code to an ICMP type and code
-fn translate_type_and_code_6_to_4(
-    icmp_type: Icmpv6Type,
-    icmp_code: Icmpv6Code,
-) -> Option<(IcmpType, IcmpCode)> {
-    match (icmp_type, icmp_code) {
-        // Echo Request
-        (Icmpv6Types::EchoRequest, _) => Some((IcmpTypes::EchoRequest, IcmpCode(0))),
+// /// Best effort translation from an ICMPv6 type and code to an ICMP type and code
+// fn translate_type_and_code_6_to_4(
+//     icmp_type: Icmpv6Type,
+//     icmp_code: Icmpv6Code,
+// ) -> Option<(IcmpType, IcmpCode)> {
+//     match (icmp_type, icmp_code) {
+//         // Echo Request
+//         (Icmpv6Types::EchoRequest, _) => Some((IcmpTypes::EchoRequest, IcmpCode(0))),
 
-        // Echo Reply
-        (Icmpv6Types::EchoReply, _) => Some((IcmpTypes::EchoReply, IcmpCode(0))),
+//         // Echo Reply
+//         (Icmpv6Types::EchoReply, _) => Some((IcmpTypes::EchoReply, IcmpCode(0))),
 
-        // Packet Too Big
-        (Icmpv6Types::PacketTooBig, _) => Some((
-            IcmpTypes::DestinationUnreachable,
-            destination_unreachable::IcmpCodes::FragmentationRequiredAndDFFlagSet,
-        )),
+//         // Packet Too Big
+//         (Icmpv6Types::PacketTooBig, _) => Some((
+//             IcmpTypes::DestinationUnreachable,
+//             destination_unreachable::IcmpCodes::FragmentationRequiredAndDFFlagSet,
+//         )),
 
-        // Destination Unreachable
-        (Icmpv6Types::DestinationUnreachable, icmp_code) => Some((
-            IcmpTypes::DestinationUnreachable,
-            #[cfg_attr(rustfmt, rustfmt_skip)]
-            match icmp_code.0 {
-                1 => destination_unreachable::IcmpCodes::CommunicationAdministrativelyProhibited,
-                2 => destination_unreachable::IcmpCodes::SourceHostIsolated,
-                3 => destination_unreachable::IcmpCodes::DestinationHostUnreachable,
-                4 => destination_unreachable::IcmpCodes::DestinationPortUnreachable,
-                5 => destination_unreachable::IcmpCodes::SourceRouteFailed,
-                _ => destination_unreachable::IcmpCodes::DestinationNetworkUnreachable,
-            },
-        )),
+//         // Destination Unreachable
+//         (Icmpv6Types::DestinationUnreachable, icmp_code) => Some((
+//             IcmpTypes::DestinationUnreachable,
+//             #[cfg_attr(rustfmt, rustfmt_skip)]
+//             match icmp_code.0 {
+//                 1 => destination_unreachable::IcmpCodes::CommunicationAdministrativelyProhibited,
+//                 2 => destination_unreachable::IcmpCodes::SourceHostIsolated,
+//                 3 => destination_unreachable::IcmpCodes::DestinationHostUnreachable,
+//                 4 => destination_unreachable::IcmpCodes::DestinationPortUnreachable,
+//                 5 => destination_unreachable::IcmpCodes::SourceRouteFailed,
+//                 _ => destination_unreachable::IcmpCodes::DestinationNetworkUnreachable,
+//             },
+//         )),
 
-        // Time Exceeded
-        (Icmpv6Types::TimeExceeded, icmp_code) => {
-            Some((IcmpTypes::TimeExceeded, IcmpCode(icmp_code.0)))
-        }
+//         // Time Exceeded
+//         (Icmpv6Types::TimeExceeded, icmp_code) => {
+//             Some((IcmpTypes::TimeExceeded, IcmpCode(icmp_code.0)))
+//         }
 
-        // Default unsupported
-        _ => {
-            log::warn!(
-                "Unsupported ICMPv6 code and type: {:?}, {:?}",
-                icmp_type,
-                icmp_code
-            );
-            None
-        }
-    }
-}
+//         // Default unsupported
+//         _ => {
+//             log::warn!(
+//                 "Unsupported ICMPv6 code and type: {:?}, {:?}",
+//                 icmp_type,
+//                 icmp_code
+//             );
+//             None
+//         }
+//     }
+// }
 
 /// Translate an ICMP packet into an ICMPv6 packet
 pub fn translate_icmp_4_to_6(

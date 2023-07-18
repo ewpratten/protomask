@@ -182,15 +182,18 @@ impl TcpPacket<RawBytes> {
 
 impl<T> Into<Vec<u8>> for TcpPacket<T>
 where
-    T: Into<Vec<u8>> + Copy,
+    T: Into<Vec<u8>> ,
 {
     fn into(self) -> Vec<u8> {
+        // Get the options length in words
+        let options_length_words = self.options_length_words();
+
         // Convert the payload into raw bytes
         let payload: Vec<u8> = self.payload.into();
 
         // Allocate a mutable packet to write into
         let total_length = pnet_packet::tcp::MutableTcpPacket::minimum_packet_size()
-            + (self.options_length_words() as usize * 4)
+            + (options_length_words as usize * 4)
             + payload.len();
         let mut output =
             pnet_packet::tcp::MutableTcpPacket::owned(vec![0u8; total_length]).unwrap();
@@ -207,7 +210,7 @@ where
         output.set_options(&self.options);
 
         // Write the offset
-        output.set_data_offset(5 + self.options_length_words());
+        output.set_data_offset(5 + options_length_words);
 
         // Write the flags
         output.set_flags(self.flags.into());

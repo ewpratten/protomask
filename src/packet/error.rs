@@ -6,5 +6,9 @@ pub enum PacketError {
     MismatchedAddressFamily(IpAddr, IpAddr),
     #[error("Packet too short: {0}")]
     TooShort(usize),
+    #[error("Unsupported ICMP type: {0}")]
+    UnsupportedIcmpType(u8),
+    #[error("Unsupported ICMPv6 type: {0}")]
+    UnsupportedIcmpv6Type(u8),
 }
 

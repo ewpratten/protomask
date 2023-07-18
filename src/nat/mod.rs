@@ -1,6 +1,6 @@
-use crate::packet::protocols::{
-    icmp::IcmpPacket, icmpv6::Icmpv6Packet, ipv4::Ipv4Packet, ipv6::Ipv6Packet, raw::RawBytes,
-    tcp::TcpPacket, udp::UdpPacket,
+use crate::packet::{
+    protocols::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
+    xlat::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4},
 };
 
 use self::{
@@ -8,7 +8,6 @@ use self::{
     utils::{embed_address, extract_address},
 };
 use ipnet::{Ipv4Net, Ipv6Net};
-use pnet_packet::ip::IpNextHeaderProtocols;
 use protomask_tun::TunDevice;
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -31,12 +30,14 @@ pub enum Nat64Error {
     TunError(#[from] protomask_tun::Error),
     #[error(transparent)]
     IoError(#[from] std::io::Error),
-    #[error(transparent)]
-    XlatError(#[from] xlat::PacketTranslationError),
+    // #[error(transparent)]
+    // XlatError(#[from] xlat::PacketTranslationError),
     #[error(transparent)]
     PacketHandlingError(#[from] crate::packet::error::PacketError),
     #[error(transparent)]
     PacketReceiveError(#[from] broadcast::error::RecvError),
+    #[error(transparent)]
+    PacketSendError(#[from] mpsc::error::SendError<Vec<u8>>),
 }
 
 pub struct Nat64 {
@@ -88,7 +89,7 @@ impl Nat64 {
             let packet = rx.recv().await?;
 
             // Clone the TX so the worker can respond with data
-            let mut tx = tx.clone();
+            let tx = tx.clone();
 
             // Separate logic is needed for handling IPv4 vs IPv6 packets, so a check must be done here
             match packet[0] >> 4 {
@@ -107,9 +108,9 @@ impl Nat64 {
 
                     // Spawn a task to process the packet
                     tokio::spawn(async move {
-                        process_inbound_ipv4(packet, new_source, new_destination, &mut tx)
-                            .await
-                            .unwrap();
+                        let output =
+                            translate_ipv4_to_ipv6(packet, new_source, new_destination).unwrap();
+                        tx.send(output.into()).await.unwrap();
                     });
                 }
                 6 => {
@@ -122,9 +123,9 @@ impl Nat64 {
 
                     // Spawn a task to process the packet
                     tokio::spawn(async move {
-                        process_inbound_ipv6(packet, new_source, new_destination, &mut tx)
-                            .await
-                            .unwrap();
+                        let output =
+                            translate_ipv6_to_ipv4(packet, new_source, new_destination).unwrap();
+                        tx.send(output.into()).await.unwrap();
                     });
                 }
                 n => {
@@ -132,85 +133,5 @@ impl Nat64 {
                 }
             }
         }
-
-        Ok(())
     }
-}
-
-/// Process an inbound IPv4 packet
-async fn process_inbound_ipv4(
-    packet: Ipv4Packet<Vec<u8>>,
-    new_source: Ipv6Addr,
-    new_destination: Ipv6Addr,
-    tx: &mut mpsc::Sender<Vec<u8>>,
-) -> Result<(), Nat64Error> {
-    // Handle each possible embedded packet type
-    match packet.protocol {
-        IpNextHeaderProtocols::Icmp => {
-            let icmp_packet: IcmpPacket<RawBytes> = packet.payload.try_into()?;
-            todo!()
-        }
-        IpNextHeaderProtocols::Udp => {
-            let udp_packet: UdpPacket<RawBytes> = UdpPacket::new_from_bytes_raw_payload(
-                &packet.payload,
-                IpAddr::V4(packet.source_address),
-                IpAddr::V4(packet.destination_address),
-            )?;
-            todo!()
-        }
-        IpNextHeaderProtocols::Tcp => {
-            let tcp_packet: TcpPacket<RawBytes> = TcpPacket::new_from_bytes_raw_payload(
-                &packet.payload,
-                IpAddr::V4(packet.source_address),
-                IpAddr::V4(packet.destination_address),
-            )?;
-            todo!()
-        }
-        _ => {
-            log::warn!("Unsupported next level protocol: {}", packet.protocol);
-        }
-    }
-
-    Ok(())
-}
-
-/// Process an inbound IPv6 packet
-async fn process_inbound_ipv6(
-    packet: Ipv6Packet<Vec<u8>>,
-    new_source: Ipv4Addr,
-    new_destination: Ipv4Addr,
-    tx: &mut mpsc::Sender<Vec<u8>>,
-) -> Result<(), Nat64Error> {
-    // Handle each possible embedded packet type
-    match packet.next_header {
-        IpNextHeaderProtocols::Icmpv6 => {
-            let icmpv6_packet: Icmpv6Packet<RawBytes> = Icmpv6Packet::new_from_bytes_raw_payload(
-                &packet.payload,
-                packet.source_address,
-                packet.destination_address,
-            )?;
-            todo!()
-        }
-        IpNextHeaderProtocols::Udp => {
-            let udp_packet: UdpPacket<RawBytes> = UdpPacket::new_from_bytes_raw_payload(
-                &packet.payload,
-                IpAddr::V6(packet.source_address),
-                IpAddr::V6(packet.destination_address),
-            )?;
-            todo!()
-        }
-        IpNextHeaderProtocols::Tcp => {
-            let tcp_packet: TcpPacket<RawBytes> = TcpPacket::new_from_bytes_raw_payload(
-                &packet.payload,
-                IpAddr::V6(packet.source_address),
-                IpAddr::V6(packet.destination_address),
-            )?;
-            todo!()
-        }
-        _ => {
-            log::warn!("Unsupported next level protocol: {}", packet.next_header);
-        }
-    }
-
-    Ok(())
 }

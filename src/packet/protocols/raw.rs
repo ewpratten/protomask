@@ -10,3 +10,9 @@ impl TryFrom<Vec<u8>> for RawBytes {
         Ok(Self(bytes))
     }
 }
+
+impl Into<Vec<u8>> for RawBytes {
+    fn into(self) -> Vec<u8> {
+        self.0
+    }
+}

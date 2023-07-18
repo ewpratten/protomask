@@ -15,12 +15,8 @@ use std::{
 };
 use tokio::sync::{broadcast, mpsc};
 
-mod interface;
-mod macros;
-// mod packet;
 mod table;
 mod utils;
-mod xlat;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Nat64Error {

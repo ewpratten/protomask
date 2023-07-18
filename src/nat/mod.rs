@@ -1,14 +1,14 @@
-use self::{
-    // interface::Nat64Interface,
-    packet::IpPacket,
-    table::{Nat64Table, TableError},
+use crate::packet::protocols::{
+    icmp::IcmpPacket, icmpv6::Icmpv6Packet, ipv4::Ipv4Packet, ipv6::Ipv6Packet, raw::RawBytes,
+    tcp::TcpPacket, udp::UdpPacket,
 };
-use crate::{
-    into_icmp, into_icmpv6, into_tcp, into_udp, ipv4_packet, ipv6_packet,
-    nat::xlat::translate_udp_4_to_6,
+
+use self::{
+    table::Nat64Table,
+    utils::{embed_address, extract_address},
 };
 use ipnet::{Ipv4Net, Ipv6Net};
-use pnet_packet::{ip::IpNextHeaderProtocols, Packet};
+use pnet_packet::ip::IpNextHeaderProtocols;
 use protomask_tun::TunDevice;
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -18,8 +18,9 @@ use tokio::sync::{broadcast, mpsc};
 
 mod interface;
 mod macros;
-mod packet;
+// mod packet;
 mod table;
+mod utils;
 mod xlat;
 
 #[derive(Debug, thiserror::Error)]
@@ -32,6 +33,8 @@ pub enum Nat64Error {
     IoError(#[from] std::io::Error),
     #[error(transparent)]
     XlatError(#[from] xlat::PacketTranslationError),
+    #[error(transparent)]
+    PacketHandlingError(#[from] crate::packet::error::PacketError),
     #[error(transparent)]
     PacketReceiveError(#[from] broadcast::error::RecvError),
 }
@@ -84,219 +87,130 @@ impl Nat64 {
             // Try to read a packet
             let packet = rx.recv().await?;
 
-
-
-            // Spawn a task to process the packet
+            // Clone the TX so the worker can respond with data
             let mut tx = tx.clone();
-            tokio::spawn(async move{
 
+            // Separate logic is needed for handling IPv4 vs IPv6 packets, so a check must be done here
+            match packet[0] >> 4 {
+                4 => {
+                    // Parse the packet
+                    let packet: Ipv4Packet<Vec<u8>> = packet.try_into()?;
 
-            });
+                    // Drop packets that aren't destined for a destination the table knows about
+                    if !self.table.contains(&IpAddr::V4(packet.destination_address)) {
+                        continue;
+                    }
+
+                    // Get the new source and dest addresses
+                    let new_source = embed_address(packet.source_address, self.ipv6_nat_prefix);
+                    let new_destination = self.table.get_reverse(packet.destination_address)?;
+
+                    // Spawn a task to process the packet
+                    tokio::spawn(async move {
+                        process_inbound_ipv4(packet, new_source, new_destination, &mut tx)
+                            .await
+                            .unwrap();
+                    });
+                }
+                6 => {
+                    // Parse the packet
+                    let packet: Ipv6Packet<Vec<u8>> = packet.try_into()?;
+
+                    // Get the new source and dest addresses
+                    let new_source = self.table.get_or_assign_ipv4(packet.source_address)?;
+                    let new_destination = extract_address(packet.destination_address);
+
+                    // Spawn a task to process the packet
+                    tokio::spawn(async move {
+                        process_inbound_ipv6(packet, new_source, new_destination, &mut tx)
+                            .await
+                            .unwrap();
+                    });
+                }
+                n => {
+                    log::warn!("Unknown IP version: {}", n);
+                }
+            }
         }
 
         Ok(())
-        // // Allocate a buffer for incoming packets
-        // let mut buffer = vec![0u8; self.interface.mtu()];
-
-        // // Loop forever
-        // loop {
-        //     // Read a packet from the interface
-        //     match self.interface.recv(&mut buffer) {
-        //         Ok(packet_len) => {
-        //             // Parse in to a more friendly format
-        //             log::debug!("--- NEW PACKET ---");
-        //             match IpPacket::new(&buffer[..packet_len]) {
-        //                 // Try to process the packet
-        //                 Ok(inbound_packet) => match self.process_packet(inbound_packet).await {
-        //                     Ok(outbound_packet) => match outbound_packet {
-        //                         // If data is returned, send it back out the interface
-        //                         Some(outbound_packet) => {
-        //                             let packet_bytes = outbound_packet.to_bytes();
-        //                             log::debug!(
-        //                                 "Outbound packet next header: {}",
-        //                                 outbound_packet.get_next_header().0
-        //                             );
-        //                             log::debug!("Sending packet: {:?}", packet_bytes);
-        //                             self.interface.send(&packet_bytes).unwrap();
-        //                         }
-        //                         // Otherwise, we can assume that the packet was dealt with, and can move on
-        //                         None => {}
-        //                     },
-
-        //                     // Some errors are non-critical as far as this loop is concerned
-        //                     Err(error) => match error {
-        //                         Nat64Error::TableError(TableError::NoIpv6Mapping(address)) => {
-        //                             log::debug!("No IPv6 mapping for {}", address);
-        //                         }
-        //                         error => {
-        //                             return Err(error);
-        //                         }
-        //                     },
-        //                 },
-        //                 Err(error) => {
-        //                     log::error!("Failed to parse packet: {}", error);
-        //                 }
-        //             }
-        //         }
-        //         Err(error) => {
-        //             log::error!("Failed to read packet: {}", error);
-        //         }
-        //     }
-        // }
     }
 }
 
-impl Nat64 {
-    
-    async fn process_packet<'a>(
-        &mut self,
-        packet: IpPacket<'a>,
-    ) -> Result<Option<IpPacket<'a>>, Nat64Error> {
-        // The destination of the packet must be within a prefix we care about
-        if match packet.get_destination() {
-            IpAddr::V4(ipv4_addr) => !self.table.is_address_within_pool(&ipv4_addr),
-            IpAddr::V6(ipv6_addr) => !self.ipv6_nat_prefix.contains(&ipv6_addr),
-        } {
-            log::debug!(
-                "Packet destination {} is not within the NAT64 prefix or IPv4 pool",
-                packet.get_destination(),
-            );
-            return Ok(None);
+/// Process an inbound IPv4 packet
+async fn process_inbound_ipv4(
+    packet: Ipv4Packet<Vec<u8>>,
+    new_source: Ipv6Addr,
+    new_destination: Ipv6Addr,
+    tx: &mut mpsc::Sender<Vec<u8>>,
+) -> Result<(), Nat64Error> {
+    // Handle each possible embedded packet type
+    match packet.protocol {
+        IpNextHeaderProtocols::Icmp => {
+            let icmp_packet: IcmpPacket<RawBytes> = packet.payload.try_into()?;
+            todo!()
         }
-
-        // Compute the translated source and dest addresses
-        let source = packet.get_source();
-        let new_source = self
-            .table
-            .calculate_xlat_addr(&source, &self.ipv6_nat_prefix)?;
-        let destination = packet.get_destination();
-        let new_destination = self
-            .table
-            .calculate_xlat_addr(&destination, &self.ipv6_nat_prefix)?;
-
-        // Log information about the packet
-        log::debug!(
-            "Received packet traveling from {} to {}",
-            source,
-            destination
-        );
-        log::debug!(
-            "New path shall become: {} -> {}",
-            new_source,
-            new_destination
-        );
-
-        // Different logic is required for ICMP, UDP, and TCP
-        match (packet, new_source, new_destination) {
-            (IpPacket::V4(packet), IpAddr::V6(new_source), IpAddr::V6(new_destination)) => {
-                match packet.get_next_level_protocol() {
-                    // Internet Control Message Protocol
-                    IpNextHeaderProtocols::Icmp => match xlat::translate_icmp_4_to_6(
-                        into_icmp!(packet.payload().to_vec())?,
-                        new_source,
-                        new_destination,
-                    )? {
-                        Some(icmp_packet) => Ok(Some(IpPacket::V6(ipv6_packet!(
-                            new_source,
-                            new_destination,
-                            IpNextHeaderProtocols::Icmpv6,
-                            packet.get_ttl(),
-                            icmp_packet.packet()
-                        )))),
-                        None => Ok(None),
-                    },
-
-                    // User Datagram Protocol
-                    IpNextHeaderProtocols::Udp => Ok(Some(IpPacket::V6(ipv6_packet!(
-                        new_source,
-                        new_destination,
-                        IpNextHeaderProtocols::Udp,
-                        packet.get_ttl(),
-                        translate_udp_4_to_6(
-                            into_udp!(packet.payload().to_vec())?,
-                            new_source,
-                            new_destination
-                        )?
-                        .packet()
-                    )))),
-
-                    // Transmission Control Protocol
-                    IpNextHeaderProtocols::Tcp => Ok(Some(IpPacket::V6(ipv6_packet!(
-                        new_source,
-                        new_destination,
-                        IpNextHeaderProtocols::Tcp,
-                        packet.get_ttl(),
-                        xlat::translate_tcp_4_to_6(
-                            into_tcp!(packet.payload().to_vec())?,
-                            new_source,
-                            new_destination
-                        )?
-                        .packet()
-                    )))),
-
-                    // For any protocol we don't support, just warn and drop the packet
-                    next_level_protocol => {
-                        log::warn!("Unsupported next level protocol: {}", next_level_protocol);
-                        Ok(None)
-                    }
-                }
-            }
-            (IpPacket::V6(packet), IpAddr::V4(new_source), IpAddr::V4(new_destination)) => {
-                match packet.get_next_header() {
-                    // Internet Control Message Protocol Version 6
-                    IpNextHeaderProtocols::Icmpv6 => match xlat::translate_icmp_6_to_4(
-                        into_icmpv6!(packet.payload().to_vec())?,
-                        new_source,
-                        new_destination,
-                    )? {
-                        Some(icmp_packet) => Ok(Some(IpPacket::V4(ipv4_packet!(
-                            new_source,
-                            new_destination,
-                            IpNextHeaderProtocols::Icmp,
-                            packet.get_hop_limit(),
-                            icmp_packet.packet()
-                        )))),
-                        None => Ok(None),
-                    },
-
-                    // User Datagram Protocol
-                    IpNextHeaderProtocols::Udp => Ok(Some(IpPacket::V4(ipv4_packet!(
-                        new_source,
-                        new_destination,
-                        IpNextHeaderProtocols::Udp,
-                        packet.get_hop_limit(),
-                        xlat::translate_udp_6_to_4(
-                            into_udp!(packet.payload().to_vec())?,
-                            new_source,
-                            new_destination
-                        )?
-                        .packet()
-                    )))),
-
-                    // Transmission Control Protocol
-                    IpNextHeaderProtocols::Tcp => Ok(Some(IpPacket::V4(ipv4_packet!(
-                        new_source,
-                        new_destination,
-                        IpNextHeaderProtocols::Tcp,
-                        packet.get_hop_limit(),
-                        xlat::translate_tcp_6_to_4(
-                            into_tcp!(packet.payload().to_vec())?,
-                            new_source,
-                            new_destination
-                        )?
-                        .packet()
-                    )))),
-
-                    // For any protocol we don't support, just warn and drop the packet
-                    next_header_protocol => {
-                        log::warn!("Unsupported next header protocol: {}", next_header_protocol);
-                        Ok(None)
-                    }
-                }
-            }
-
-            // Honestly, this should probably be `unreachable!()`
-            _ => unimplemented!(),
+        IpNextHeaderProtocols::Udp => {
+            let udp_packet: UdpPacket<RawBytes> = UdpPacket::new_from_bytes_raw_payload(
+                &packet.payload,
+                IpAddr::V4(packet.source_address),
+                IpAddr::V4(packet.destination_address),
+            )?;
+            todo!()
+        }
+        IpNextHeaderProtocols::Tcp => {
+            let tcp_packet: TcpPacket<RawBytes> = TcpPacket::new_from_bytes_raw_payload(
+                &packet.payload,
+                IpAddr::V4(packet.source_address),
+                IpAddr::V4(packet.destination_address),
+            )?;
+            todo!()
+        }
+        _ => {
+            log::warn!("Unsupported next level protocol: {}", packet.protocol);
         }
     }
+
+    Ok(())
+}
+
+/// Process an inbound IPv6 packet
+async fn process_inbound_ipv6(
+    packet: Ipv6Packet<Vec<u8>>,
+    new_source: Ipv4Addr,
+    new_destination: Ipv4Addr,
+    tx: &mut mpsc::Sender<Vec<u8>>,
+) -> Result<(), Nat64Error> {
+    // Handle each possible embedded packet type
+    match packet.next_header {
+        IpNextHeaderProtocols::Icmpv6 => {
+            let icmpv6_packet: Icmpv6Packet<RawBytes> = Icmpv6Packet::new_from_bytes_raw_payload(
+                &packet.payload,
+                packet.source_address,
+                packet.destination_address,
+            )?;
+            todo!()
+        }
+        IpNextHeaderProtocols::Udp => {
+            let udp_packet: UdpPacket<RawBytes> = UdpPacket::new_from_bytes_raw_payload(
+                &packet.payload,
+                IpAddr::V6(packet.source_address),
+                IpAddr::V6(packet.destination_address),
+            )?;
+            todo!()
+        }
+        IpNextHeaderProtocols::Tcp => {
+            let tcp_packet: TcpPacket<RawBytes> = TcpPacket::new_from_bytes_raw_payload(
+                &packet.payload,
+                IpAddr::V6(packet.source_address),
+                IpAddr::V6(packet.destination_address),
+            )?;
+            todo!()
+        }
+        _ => {
+            log::warn!("Unsupported next level protocol: {}", packet.next_header);
+        }
+    }
+
+    Ok(())
 }

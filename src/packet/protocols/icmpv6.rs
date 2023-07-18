@@ -7,6 +7,8 @@ use pnet_packet::{
 
 use crate::packet::error::PacketError;
 
+use super::raw::RawBytes;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Icmpv6Packet<T> {
     pub source_address: Ipv6Addr,
@@ -60,7 +62,7 @@ where
     }
 }
 
-impl Icmpv6Packet<Vec<u8>> {
+impl Icmpv6Packet<RawBytes> {
     /// Construct a new ICMPv6 packet with a raw payload from raw bytes
     pub fn new_from_bytes_raw_payload(
         bytes: &[u8],
@@ -77,7 +79,7 @@ impl Icmpv6Packet<Vec<u8>> {
             destination_address,
             icmp_type: packet.get_icmpv6_type(),
             icmp_code: packet.get_icmpv6_code(),
-            payload: packet.payload().to_vec(),
+            payload: RawBytes(packet.payload().to_vec()),
         })
     }
 }

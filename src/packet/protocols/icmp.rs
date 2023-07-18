@@ -43,6 +43,7 @@ where
     }
 }
 
+
 impl<T> Into<Vec<u8>> for IcmpPacket<T>
 where
     T: Into<Vec<u8>>,

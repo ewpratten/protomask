@@ -5,6 +5,7 @@ use pnet_packet::{
     Packet,
 };
 
+use super::raw::RawBytes;
 use crate::packet::error::PacketError;
 
 /// A TCP packet
@@ -145,7 +146,7 @@ where
     }
 }
 
-impl TcpPacket<Vec<u8>> {
+impl TcpPacket<RawBytes> {
     /// Construct a new TCP packet with a raw payload from bytes
     pub fn new_from_bytes_raw_payload(
         bytes: &[u8],
@@ -174,7 +175,7 @@ impl TcpPacket<Vec<u8>> {
             window_size: parsed.get_window(),
             urgent_pointer: parsed.get_urgent_ptr(),
             options: parsed.get_options().to_vec(),
-            payload: parsed.payload().to_vec(),
+            payload: RawBytes(parsed.payload().to_vec()),
         })
     }
 }

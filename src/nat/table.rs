@@ -67,6 +67,14 @@ impl Nat64Table {
         Ok(())
     }
 
+    /// Check if a given address exists in the table
+    pub fn contains(&self, address: &IpAddr) -> bool {
+        match address {
+            IpAddr::V4(ipv4) => self.reservations.contains_right(ipv4),
+            IpAddr::V6(ipv6) => self.reservations.contains_left(ipv6),
+        }
+    }
+
     /// Get or assign an IPv4 address for the given IPv6 address
     pub fn get_or_assign_ipv4(&mut self, ipv6: Ipv6Addr) -> Result<Ipv4Addr, TableError> {
         // Prune old reservations

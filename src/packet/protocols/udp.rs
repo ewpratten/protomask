@@ -2,6 +2,7 @@ use std::net::{IpAddr, SocketAddr};
 
 use pnet_packet::Packet;
 
+use super::raw::RawBytes;
 use crate::packet::error::PacketError;
 
 /// A UDP packet
@@ -109,7 +110,7 @@ where
     }
 }
 
-impl UdpPacket<Vec<u8>> {
+impl UdpPacket<RawBytes> {
     /// Construct a new UDP packet with a raw payload from bytes
     pub fn new_from_bytes_raw_payload(
         bytes: &[u8],
@@ -132,7 +133,7 @@ impl UdpPacket<Vec<u8>> {
         Ok(Self {
             source: SocketAddr::new(source_address, parsed.get_source()),
             destination: SocketAddr::new(destination_address, parsed.get_destination()),
-            payload: parsed.payload().to_vec(),
+            payload: RawBytes(parsed.payload().to_vec()),
         })
     }
 }

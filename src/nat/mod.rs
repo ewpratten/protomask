@@ -4,6 +4,7 @@ use crate::packet::{
 };
 
 use self::{
+    error::Nat64Error,
     table::Nat64Table,
     utils::{embed_address, extract_address},
 };
@@ -13,28 +14,11 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     time::Duration,
 };
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 
+mod error;
 mod table;
 mod utils;
-
-#[derive(Debug, thiserror::Error)]
-pub enum Nat64Error {
-    #[error(transparent)]
-    TableError(#[from] table::TableError),
-    #[error(transparent)]
-    TunError(#[from] protomask_tun::Error),
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-    // #[error(transparent)]
-    // XlatError(#[from] xlat::PacketTranslationError),
-    #[error(transparent)]
-    PacketHandlingError(#[from] crate::packet::error::PacketError),
-    #[error(transparent)]
-    PacketReceiveError(#[from] broadcast::error::RecvError),
-    #[error(transparent)]
-    PacketSendError(#[from] mpsc::error::SendError<Vec<u8>>),
-}
 
 pub struct Nat64 {
     table: Nat64Table,
@@ -116,10 +100,31 @@ impl Nat64 {
                             // Parse the packet
                             let packet: Ipv6Packet<Vec<u8>> = packet.try_into()?;
 
+                            // Drop packets "coming from" the NAT64 prefix
+                            if self.ipv6_nat_prefix.contains(&packet.source_address) {
+                                log::warn!(
+                                    "Dropping packet \"from\" NAT64 prefix: {} -> {}",
+                                    packet.source_address,
+                                    packet.destination_address
+                                );
+                                continue;
+                            }
+
                             // Get the new source and dest addresses
                             let new_source =
                                 self.table.get_or_assign_ipv4(packet.source_address)?;
                             let new_destination = extract_address(packet.destination_address);
+
+                            // Drop packets destined for private IPv4 addresses
+                            if new_destination.is_private() {
+                                log::warn!(
+                                    "Dropping packet destined for private IPv4 address: {} -> {} ({})",
+                                    packet.source_address,
+                                    packet.destination_address,
+                                    new_destination
+                                );
+                                continue;
+                            }
 
                             // Spawn a task to process the packet
                             tokio::spawn(async move {

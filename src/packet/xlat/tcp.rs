@@ -6,6 +6,7 @@ use crate::packet::{
 };
 
 /// Translates an IPv4 TCP packet to an IPv6 TCP packet
+#[profiling::function]
 pub fn translate_tcp4_to_tcp6(
     input: TcpPacket<RawBytes>,
     new_source_addr: Ipv6Addr,
@@ -26,6 +27,7 @@ pub fn translate_tcp4_to_tcp6(
 }
 
 /// Translates an IPv6 TCP packet to an IPv4 TCP packet
+#[profiling::function]
 pub fn translate_tcp6_to_tcp4(
     input: TcpPacket<RawBytes>,
     new_source_addr: Ipv4Addr,

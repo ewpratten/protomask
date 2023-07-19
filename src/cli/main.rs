@@ -1,5 +1,6 @@
 //! This is the entrypoint for `protomask` from the command line.
 
+use cfg_if::cfg_if;
 use clap::Parser;
 use config::Config;
 use logging::enable_logger;
@@ -24,6 +25,16 @@ pub async fn main() {
     if config.nat64_prefix.prefix_len() != 96 {
         log::error!("Only a /96 prefix is supported for the NAT64 prefix");
         std::process::exit(1);
+    }
+
+    // Enable the profiler if enabled by build flags
+    cfg_if! {
+        if #[cfg(feature = "profiler")] {
+            let puffin_listen_addr = format!("[::]:{}", puffin_http::DEFAULT_PORT);
+            log::info!("Puffin HTTP server listening on: {}", puffin_listen_addr);
+            let _puffin_server = puffin_http::Server::new(&puffin_listen_addr).unwrap();
+            puffin::set_scopes_on(true);
+        }
     }
 
     // Create the NAT64 instance

@@ -42,6 +42,7 @@ where
     T: From<Vec<u8>>,
 {
     /// Construct a new ICMPv6 packet from raw bytes
+    #[profiling::function]
     pub fn new_from_bytes(
         bytes: &[u8],
         source_address: Ipv6Addr,
@@ -64,6 +65,7 @@ where
 
 impl Icmpv6Packet<RawBytes> {
     /// Construct a new ICMPv6 packet with a raw payload from raw bytes
+    #[profiling::function]
     pub fn new_from_bytes_raw_payload(
         bytes: &[u8],
         source_address: Ipv6Addr,
@@ -88,6 +90,7 @@ impl<T> Into<Vec<u8>> for Icmpv6Packet<T>
 where
     T: Into<Vec<u8>>,
 {
+    #[profiling::function]
     fn into(self) -> Vec<u8> {
         // Convert the payload into raw bytes
         let payload: Vec<u8> = self.payload.into();

@@ -84,6 +84,7 @@ where
     T: From<Vec<u8>>,
 {
     /// Construct a new UDP packet from bytes
+    #[profiling::function]
     pub fn new_from_bytes(
         bytes: &[u8],
         source_address: IpAddr,
@@ -112,6 +113,7 @@ where
 
 impl UdpPacket<RawBytes> {
     /// Construct a new UDP packet with a raw payload from bytes
+    #[profiling::function]
     pub fn new_from_bytes_raw_payload(
         bytes: &[u8],
         source_address: IpAddr,
@@ -142,6 +144,7 @@ impl<T> Into<Vec<u8>> for UdpPacket<T>
 where
     T: Into<Vec<u8>>,
 {
+    #[profiling::function]
     fn into(self) -> Vec<u8> {
         // Convert the payload into raw bytes
         let payload: Vec<u8> = self.payload.into();

@@ -53,6 +53,7 @@ impl<T> Ipv4Packet<T> {
         }
     }
 
+    #[profiling::function]
     fn options_length_words(&self) -> u8 {
         self.options
             .iter()
@@ -68,6 +69,7 @@ where
 {
     type Error = PacketError;
 
+    #[profiling::function]
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
         let packet =
@@ -94,6 +96,7 @@ impl<T> Into<Vec<u8>> for Ipv4Packet<T>
 where
     T: Into<Vec<u8>> + Clone,
 {
+    #[profiling::function]
     fn into(self) -> Vec<u8> {
         // Convert the payload into raw bytes
         let payload: Vec<u8> = self.payload.clone().into();

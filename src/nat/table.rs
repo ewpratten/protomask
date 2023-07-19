@@ -47,6 +47,7 @@ impl Nat64Table {
     }
 
     /// Make a reservation for an IP address pair for eternity
+    #[profiling::function]
     pub fn add_infinite_reservation(
         &mut self,
         ipv6: Ipv6Addr,
@@ -68,6 +69,7 @@ impl Nat64Table {
     }
 
     /// Check if a given address exists in the table
+    #[profiling::function]
     pub fn contains(&self, address: &IpAddr) -> bool {
         match address {
             IpAddr::V4(ipv4) => self.reservations.contains_right(ipv4),
@@ -76,6 +78,7 @@ impl Nat64Table {
     }
 
     /// Get or assign an IPv4 address for the given IPv6 address
+    #[profiling::function]
     pub fn get_or_assign_ipv4(&mut self, ipv6: Ipv6Addr) -> Result<Ipv4Addr, TableError> {
         // Prune old reservations
         self.prune();
@@ -110,6 +113,7 @@ impl Nat64Table {
     }
 
     /// Try to find an IPv6 address for the given IPv4 address
+    #[profiling::function]
     pub fn get_reverse(&mut self, ipv4: Ipv4Addr) -> Result<Ipv6Addr, TableError> {
         // Prune old reservations
         self.prune();
@@ -129,11 +133,13 @@ impl Nat64Table {
     }
 
     /// Check if an address is within the IPv4 pool
+    #[profiling::function]
     pub fn is_address_within_pool(&self, address: &Ipv4Addr) -> bool {
         self.ipv4_pool.iter().any(|net| net.contains(address))
     }
 
     /// Calculate the translated version of any address
+    #[profiling::function]
     pub fn calculate_xlat_addr(
         &mut self,
         input: &IpAddr,
@@ -186,6 +192,7 @@ impl Nat64Table {
 
 impl Nat64Table {
     /// Prune old reservations
+    #[profiling::function]
     pub fn prune(&mut self) {
         let now = Instant::now();
 

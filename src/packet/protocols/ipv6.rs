@@ -44,6 +44,7 @@ where
 {
     type Error = PacketError;
 
+    #[profiling::function]
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
         let packet =
@@ -66,6 +67,7 @@ impl<T> Into<Vec<u8>> for Ipv6Packet<T>
 where
     T: Into<Vec<u8>>,
 {
+    #[profiling::function]
     fn into(self) -> Vec<u8> {
         // Convert the payload into raw bytes
         let payload: Vec<u8> = self.payload.into();

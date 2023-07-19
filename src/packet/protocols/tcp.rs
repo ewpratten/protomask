@@ -113,6 +113,7 @@ where
     T: From<Vec<u8>>,
 {
     /// Construct a new TCP packet from bytes
+    #[profiling::function]
     pub fn new_from_bytes(
         bytes: &[u8],
         source_address: IpAddr,
@@ -147,6 +148,7 @@ where
 
 impl TcpPacket<RawBytes> {
     /// Construct a new TCP packet with a raw payload from bytes
+    #[profiling::function]
     pub fn new_from_bytes_raw_payload(
         bytes: &[u8],
         source_address: IpAddr,
@@ -183,6 +185,7 @@ impl<T> Into<Vec<u8>> for TcpPacket<T>
 where
     T: Into<Vec<u8>>,
 {
+    #[profiling::function]
     fn into(self) -> Vec<u8> {
         // Get the options length in words
         let options_length = self.options_length();

@@ -1,6 +1,13 @@
-use crate::packet::{
-    protocols::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
-    xlat::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4},
+use crate::{
+    count_packet, count_packet_ipv4,
+    metrics::{
+        labels::PacketStatus,
+        registry::{MetricEvent, MetricEventSender},
+    },
+    packet::{
+        protocols::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
+        xlat::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4},
+    }, count_packet_ipv6,
 };
 
 use self::{
@@ -34,6 +41,8 @@ pub enum Nat64Error {
     PacketReceiveError(#[from] broadcast::error::RecvError),
     #[error(transparent)]
     PacketSendError(#[from] mpsc::error::SendError<Vec<u8>>),
+    #[error(transparent)]
+    MetricSendError(#[from] mpsc::error::SendError<MetricEvent>),
 }
 
 pub struct Nat64 {
@@ -75,7 +84,7 @@ impl Nat64 {
     }
 
     /// Block and process all packets
-    pub async fn run(&mut self) -> Result<(), Nat64Error> {
+    pub async fn run(&mut self, metric_sender: MetricEventSender) -> Result<(), Nat64Error> {
         // Get an rx/tx pair for the interface
         let (tx, mut rx) = self.interface.spawn_worker().await;
 
@@ -95,6 +104,10 @@ impl Nat64 {
 
                             // Drop packets that aren't destined for a destination the table knows about
                             if !self.table.contains(&IpAddr::V4(packet.destination_address)) {
+                                // Update metrics
+                                count_packet_ipv4!(metric_sender, PacketStatus::Dropped)?;
+
+                                // Drop packet
                                 continue;
                             }
 
@@ -105,28 +118,61 @@ impl Nat64 {
                                 self.table.get_reverse(packet.destination_address)?;
 
                             // Spawn a task to process the packet
+                            let metric_sender = metric_sender.clone();
                             tokio::spawn(async move {
+                                count_packet_ipv4!(metric_sender, PacketStatus::Accepted).unwrap();
+
+                                // Process the packet
                                 let output =
                                     translate_ipv4_to_ipv6(packet, new_source, new_destination)
                                         .unwrap();
+
+                                // Send the translated packet
                                 tx.send(output.into()).await.unwrap();
+                                count_packet_ipv6!(metric_sender, PacketStatus::Sent).unwrap();
                             });
                         }
                         6 => {
                             // Parse the packet
                             let packet: Ipv6Packet<Vec<u8>> = packet.try_into()?;
 
+                            // Drop packets "coming from" the NAT64 prefix
+                            if self.ipv6_nat_prefix.contains(&packet.source_address) {
+                                log::warn!(
+                                    "Dropping packet \"from\" NAT64 prefix: {} -> {}",
+                                    packet.source_address,
+                                    packet.destination_address
+                                );
+                                count_packet_ipv6!(metric_sender, PacketStatus::Dropped)?;
+                                continue;
+                            }
+
                             // Get the new source and dest addresses
                             let new_source =
                                 self.table.get_or_assign_ipv4(packet.source_address)?;
                             let new_destination = extract_address(packet.destination_address);
 
+                            // Drop packets destined for private IPv4 addresses
+                            if new_destination.is_private() {
+                                log::warn!(
+                                    "Dropping packet destined for private IPv4 address: {} -> {} ({})",
+                                    packet.source_address,
+                                    packet.destination_address,
+                                    new_destination
+                                );
+                                count_packet_ipv6!(metric_sender, PacketStatus::Dropped)?;
+                                continue;
+                            }
+
                             // Spawn a task to process the packet
+                            let metric_sender = metric_sender.clone();
                             tokio::spawn(async move {
+                                count_packet_ipv6!(metric_sender, PacketStatus::Accepted).unwrap();
                                 let output =
                                     translate_ipv6_to_ipv4(packet, new_source, new_destination)
                                         .unwrap();
                                 tx.send(output.into()).await.unwrap();
+                                count_packet_ipv4!(metric_sender, PacketStatus::Sent).unwrap();
                             });
                         }
                         n => {

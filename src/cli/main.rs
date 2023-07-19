@@ -3,7 +3,7 @@
 use clap::Parser;
 use config::Config;
 use logging::enable_logger;
-use protomask::nat::Nat64;
+use protomask::{nat::Nat64, metrics::registry::MetricRegistry};
 
 mod cli;
 mod config;
@@ -22,7 +22,7 @@ pub async fn main() {
 
     // Currently, only a /96 is supported
     if config.nat64_prefix.prefix_len() != 96 {
-        log::error!("Only a /96 prefix is supported for the NAT64 prefix");
+        log::error!("Only a /96 length is supported for the NAT64 prefix");
         std::process::exit(1);
     }
 
@@ -41,6 +41,15 @@ pub async fn main() {
     .await
     .unwrap();
 
+    // Create a metric registry
+    let mut metric_registry = MetricRegistry::new();
+    let metric_sender = metric_registry.get_sender();
+
+    // Run the metric registry
+    tokio::spawn(async move {
+        metric_registry.run().await;
+    });
+
     // Handle packets
-    nat64.run().await.unwrap();
+    nat64.run(metric_sender).await.unwrap();
 }

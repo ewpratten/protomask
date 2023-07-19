@@ -4,3 +4,4 @@
 
 pub mod nat;
 mod packet;
+pub mod metrics;

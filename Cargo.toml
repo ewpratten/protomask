@@ -16,6 +16,7 @@ categories = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+protomask-tun = { path = "protomask-tun", version = "0.1.0" }
 tokio = { version = "1.29.1", features = [
     "macros",
     "rt-multi-thread",
@@ -36,7 +37,7 @@ bimap = "0.6.3"
 pnet_packet = "0.33.0"
 rtnetlink = "0.13.0"
 futures = "0.3.28"
-protomask-tun = { path = "protomask-tun", version = "0.1.0" }
+prometheus-client = "0.21.2"
 
 [[bin]]
 name = "protomask"

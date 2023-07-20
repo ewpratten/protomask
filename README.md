@@ -5,7 +5,9 @@
 
 **A user space [NAT64](https://en.wikipedia.org/wiki/NAT64) implementation.**
 
-Protomask started as a challenge to create a NAT64 implementation in a weekend. The goal of this implementation is to *keep things simple*. There aren't many knobs to tweak, so if you want to do stateful NAT or source address filtering, put something like `iptables` in front of it.
+Protomask started as a challenge to create a NAT64 implementation in a weekend. The goal of protomask is to *keep things simple*.
+
+There aren't many knobs to tweak, so stateful NAT or source address filtering will require protomask to be paired with a utility like `iptables`.
 
 ## How it works
 

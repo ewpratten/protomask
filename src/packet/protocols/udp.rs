@@ -102,7 +102,7 @@ where
 
         // Parse the packet
         let parsed = pnet_packet::udp::UdpPacket::new(bytes)
-            .ok_or_else(|| PacketError::TooShort(bytes.len()))?;
+            .ok_or_else(|| PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
 
         // Build the struct
         Ok(Self {
@@ -130,7 +130,7 @@ impl UdpPacket<RawBytes> {
 
         // Parse the packet
         let parsed = pnet_packet::udp::UdpPacket::new(bytes)
-            .ok_or_else(|| PacketError::TooShort(bytes.len()))?;
+            .ok_or_else(|| PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
 
         // Build the struct
         Ok(Self {

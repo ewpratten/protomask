@@ -71,7 +71,7 @@ where
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
         let packet =
-            pnet_packet::ipv4::Ipv4Packet::new(&bytes).ok_or(PacketError::TooShort(bytes.len()))?;
+            pnet_packet::ipv4::Ipv4Packet::new(&bytes).ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
 
         // Return the packet
         Ok(Self {

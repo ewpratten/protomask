@@ -31,8 +31,8 @@ where
 
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
-        let packet =
-            pnet_packet::icmp::IcmpPacket::new(&bytes).ok_or(PacketError::TooShort(bytes.len()))?;
+        let packet = pnet_packet::icmp::IcmpPacket::new(&bytes)
+            .ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
 
         // Return the packet
         Ok(Self {
@@ -42,7 +42,6 @@ where
         })
     }
 }
-
 
 impl<T> Into<Vec<u8>> for IcmpPacket<T>
 where

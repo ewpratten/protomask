@@ -1,5 +1,6 @@
 //! This is the entrypoint for `protomask` from the command line.
 
+use cfg_if::cfg_if;
 use clap::Parser;
 use config::Config;
 use logging::enable_logger;
@@ -24,6 +25,17 @@ pub async fn main() {
     if config.nat64_prefix.prefix_len() != 96 {
         log::error!("Only a /96 prefix is supported for the NAT64 prefix");
         std::process::exit(1);
+    }
+
+    // Enable Sentry reporting
+    cfg_if! {
+        if #[cfg(feature = "sentry")] {
+            log::debug!("Enabling Sentry reporting");
+            let _guard = sentry::init(("https://376a29d0fd7c40d0a82f05a7e8c3600e@o4504175421947904.ingest.sentry.io/4505563054080000", sentry::ClientOptions {
+                release: sentry::release_name!(),
+                ..Default::default()
+            }));
+        }
     }
 
     // Create the NAT64 instance

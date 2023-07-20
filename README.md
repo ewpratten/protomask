@@ -40,11 +40,19 @@ Static = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]
 
 Protomask can be installed using various methods:
 
-### Using pre-built binaries
+### Debian
 
-Head over to the [releases](https://github.com/ewpratten/protomask/releases) page and download the latest release for your platform. 
+Head over to the [releases](https://github.com/ewpratten/protomask/releases) page and download the latest release for your architecture.
 
-This will contain a binary and example config file to get you started.
+Then, install with:
+
+```sh
+apt install /path/to/protomask_<version>_<arch>.deb
+
+# You can also edit the config file in /etc/protomask.toml
+# And once ready, start protomask with
+systemctl start protomask
+```
 
 ### Using Cargo
 

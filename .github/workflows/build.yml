@@ -1,6 +1,13 @@
-on: [push, pull_request]
-
 name: Build
+
+on:
+  pull_request:
+  push:
+    paths: 
+      - '.github/workflows/build.yml'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '**/src/*'
 
 jobs:
   build_and_test:

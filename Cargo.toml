@@ -46,10 +46,10 @@ path = "src/cli/main.rs"
 [package.metadata.deb]
 section = "network"
 assets = [
-    ["target/release/protomask", "usr/local/bin/", "755"],
-    ["etc/protomask.toml", "etc", "644"]
+    ["target/release/protomask", "/usr/local/bin/protomask", "755"],
+    ["./protomask.toml", "/etc/protomask.toml", "644"]
 ]
 conf-files = ["/etc/protomask.toml"]
 depends = []
-maintainer-scripts = "debian/"
+maintainer-scripts = "./debian/"
 systemd-units = { enable = false }

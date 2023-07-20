@@ -41,6 +41,12 @@ pub async fn main() {
     .await
     .unwrap();
 
+    // Handle metrics requests
+    if let Some(bind_addr) = config.prom_bind_addr {
+        log::info!("Enabling metrics server on {}", bind_addr);
+        tokio::spawn(protomask::metrics::serve_metrics(bind_addr));
+    }
+
     // Handle packets
     nat64.run().await.unwrap();
 }

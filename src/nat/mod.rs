@@ -1,6 +1,9 @@
-use crate::packet::{
-    protocols::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
-    xlat::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4},
+use crate::{
+    metrics::PACKET_COUNTER,
+    packet::{
+        protocols::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
+        xlat::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4},
+    },
 };
 
 use self::{
@@ -79,6 +82,7 @@ impl Nat64 {
 
                             // Drop packets that aren't destined for a destination the table knows about
                             if !self.table.contains(&IpAddr::V4(packet.destination_address)) {
+                                PACKET_COUNTER.with_label_values(&["ipv4", "dropped"]).inc();
                                 continue;
                             }
 
@@ -88,12 +92,18 @@ impl Nat64 {
                             let new_destination =
                                 self.table.get_reverse(packet.destination_address)?;
 
+                            // Mark the packet as accepted
+                            PACKET_COUNTER
+                                .with_label_values(&["ipv4", "accepted"])
+                                .inc();
+
                             // Spawn a task to process the packet
                             tokio::spawn(async move {
                                 let output =
                                     translate_ipv4_to_ipv6(packet, new_source, new_destination)
                                         .unwrap();
                                 tx.send(output.into()).await.unwrap();
+                                PACKET_COUNTER.with_label_values(&["ipv6", "sent"]).inc();
                             });
                         }
                         6 => {
@@ -107,6 +117,7 @@ impl Nat64 {
                                     packet.source_address,
                                     packet.destination_address
                                 );
+                                PACKET_COUNTER.with_label_values(&["ipv6", "dropped"]).inc();
                                 continue;
                             }
 
@@ -123,8 +134,14 @@ impl Nat64 {
                                     packet.destination_address,
                                     new_destination
                                 );
+                                PACKET_COUNTER.with_label_values(&["ipv6", "dropped"]).inc();
                                 continue;
                             }
+
+                            // Mark the packet as accepted
+                            PACKET_COUNTER
+                                .with_label_values(&["ipv6", "accepted"])
+                                .inc();
 
                             // Spawn a task to process the packet
                             tokio::spawn(async move {
@@ -132,6 +149,7 @@ impl Nat64 {
                                     translate_ipv6_to_ipv4(packet, new_source, new_destination)
                                         .unwrap();
                                 tx.send(output.into()).await.unwrap();
+                                PACKET_COUNTER.with_label_values(&["ipv4", "sent"]).inc();
                             });
                         }
                         n => {

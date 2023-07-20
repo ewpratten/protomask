@@ -2,9 +2,12 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use pnet_packet::{icmp::IcmpTypes, icmpv6::Icmpv6Types};
 
-use crate::packet::{
-    error::PacketError,
-    protocols::{icmp::IcmpPacket, icmpv6::Icmpv6Packet, raw::RawBytes},
+use crate::{
+    metrics::ICMP_COUNTER,
+    packet::{
+        error::PacketError,
+        protocols::{icmp::IcmpPacket, icmpv6::Icmpv6Packet, raw::RawBytes},
+    },
 };
 
 use super::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
@@ -17,6 +20,14 @@ pub fn translate_icmp_to_icmpv6(
     new_source: Ipv6Addr,
     new_destination: Ipv6Addr,
 ) -> Result<Icmpv6Packet<RawBytes>, PacketError> {
+    ICMP_COUNTER
+        .with_label_values(&[
+            "icmp",
+            &input.icmp_type.0.to_string(),
+            &input.icmp_code.0.to_string(),
+        ])
+        .inc();
+
     // Translate the type and code
     let (icmpv6_type, icmpv6_code) =
         type_code::translate_type_and_code_4_to_6(input.icmp_type, input.icmp_code)?;
@@ -60,6 +71,14 @@ pub fn translate_icmpv6_to_icmp(
     new_source: Ipv4Addr,
     new_destination: Ipv4Addr,
 ) -> Result<IcmpPacket<RawBytes>, PacketError> {
+    ICMP_COUNTER
+        .with_label_values(&[
+            "icmpv6",
+            &input.icmp_type.0.to_string(),
+            &input.icmp_code.0.to_string(),
+        ])
+        .inc();
+
     // Translate the type and code
     let (icmp_type, icmp_code) =
         type_code::translate_type_and_code_6_to_4(input.icmp_type, input.icmp_code)?;
@@ -83,7 +102,7 @@ pub fn translate_icmpv6_to_icmp(
                 buffer.extend_from_slice(&inner_payload);
                 buffer
             })
-        },
+        }
         _ => input.payload,
     };
 

@@ -7,6 +7,8 @@ use std::{
 use bimap::BiHashMap;
 use ipnet::{Ipv4Net, Ipv6Net};
 
+use crate::metrics::{IPV4_POOL_RESERVED, IPV4_POOL_SIZE};
+
 /// Possible errors thrown in the address reservation process
 #[derive(Debug, thiserror::Error)]
 pub enum TableError {
@@ -38,6 +40,10 @@ impl Nat64Table {
     /// - `ipv4_pool`: The pool of IPv4 addresses to use in the mapping process
     /// - `reservation_timeout`: The amount of time to reserve an address pair for
     pub fn new(ipv4_pool: Vec<Ipv4Net>, reservation_timeout: Duration) -> Self {
+        // Track the total pool size
+        let total_size: usize = ipv4_pool.iter().map(|net| net.hosts().count()).sum();
+        IPV4_POOL_SIZE.set(total_size as i64);
+
         Self {
             ipv4_pool,
             reservations: BiHashMap::new(),
@@ -54,6 +60,7 @@ impl Nat64Table {
     ) -> Result<(), TableError> {
         // Check if either address is already reserved
         self.prune();
+        self.track_utilization();
         if self.reservations.contains_left(&ipv6) {
             return Err(TableError::AddressAlreadyReserved(ipv6.into()));
         } else if self.reservations.contains_right(&ipv4) {
@@ -79,6 +86,7 @@ impl Nat64Table {
     pub fn get_or_assign_ipv4(&mut self, ipv6: Ipv6Addr) -> Result<Ipv4Addr, TableError> {
         // Prune old reservations
         self.prune();
+        self.track_utilization();
 
         // If the IPv6 address is already reserved, return the IPv4 address
         if let Some(ipv4) = self.reservations.get_by_left(&ipv6) {
@@ -113,6 +121,7 @@ impl Nat64Table {
     pub fn get_reverse(&mut self, ipv4: Ipv4Addr) -> Result<Ipv6Addr, TableError> {
         // Prune old reservations
         self.prune();
+        self.track_utilization();
 
         // If the IPv4 address is already reserved, return the IPv6 address
         if let Some(ipv6) = self.reservations.get_by_right(&ipv4) {
@@ -186,7 +195,7 @@ impl Nat64Table {
 
 impl Nat64Table {
     /// Prune old reservations
-    pub fn prune(&mut self) {
+    fn prune(&mut self) {
         let now = Instant::now();
 
         // Prune from the reservation map
@@ -210,6 +219,26 @@ impl Nat64Table {
         self.reservation_times.retain(|(v6, v4), _| {
             self.reservations.contains_left(v6) && self.reservations.contains_right(v4)
         });
+    }
+
+    fn track_utilization(&self) {
+        // Count static and dynamic in a single pass
+        let (total_dynamic_reservations, total_static_reservations) = self
+            .reservation_times
+            .iter()
+            .map(|((_v6, _v4), time)| match time {
+                Some(_) => (1, 0),
+                None => (0, 1),
+            })
+            .fold((0, 0), |(a1, a2), (b1, b2)| (a1 + b1, a2 + b2));
+
+        // Track the values
+        IPV4_POOL_RESERVED
+            .with_label_values(&["dynamic"])
+            .set(total_dynamic_reservations as i64);
+        IPV4_POOL_RESERVED
+            .with_label_values(&["static"])
+            .set(total_static_reservations as i64);
     }
 }
 

@@ -1,7 +1,7 @@
 //! Serde definitions for the config file
 
 use std::{
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     path::Path,
     time::Duration,
 };
@@ -50,6 +50,9 @@ pub struct Config {
     /// The NAT64 prefix
     #[serde(rename = "Nat64Prefix")]
     pub nat64_prefix: Ipv6Net,
+    /// Address to bind to for prometheus support
+    #[serde(rename = "Prometheus")]
+    pub prom_bind_addr: Option<SocketAddr>,
     /// Pool configuration
     #[serde(rename = "Pool")]
     pub pool: PoolConfig,

@@ -12,10 +12,9 @@ license = "GPL-3.0"
 keywords = []
 categories = []
 
-
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
+protomask-tun = { path = "protomask-tun", version = "0.1.0" }
 tokio = { version = "1.29.1", features = [
     "macros",
     "rt-multi-thread",
@@ -25,6 +24,7 @@ tokio = { version = "1.29.1", features = [
 clap = { version = "4.3.11", features = ["derive"] }
 serde = { version = "1.0.171", features = ["derive"] }
 ipnet = { version = "2.8.0", features = ["serde"] }
+hyper = { version = "0.14.27", features = ["server", "http1", "tcp"] }
 toml = "0.7.6"
 log = "0.4.19"
 fern = "0.6.2"
@@ -36,7 +36,8 @@ bimap = "0.6.3"
 pnet_packet = "0.33.0"
 rtnetlink = "0.13.0"
 futures = "0.3.28"
-protomask-tun = { path = "protomask-tun", version = "0.1.0" }
+prometheus = "0.13.3"
+lazy_static = "1.4.0"
 
 [[bin]]
 name = "protomask"

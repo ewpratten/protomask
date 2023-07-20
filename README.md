@@ -9,13 +9,13 @@ Protomask started as a challenge to create a NAT64 implementation in a weekend. 
 
 ## How it works
 
-Protomask listens on an IPv6 `/96` prefix for incoming traffic.
+Protomask operates by listening on an IPv6 `/96` prefix for incoming traffic.
 
-When traffic destined for an [embedded IPv4 address](https://datatracker.ietf.org/doc/html/rfc6052) is received, the source IPv6 address is assigned a real IPv4 address from a pool of addresses on a first-come-first-serve basis.
+When a new IPv6 host sends traffic through protomask, it is dynamically assigned an IPv4 address from a pool of addresses on a first-come-first-serve basis.
 
-All further packets from that source IPv6 address will be NATed through its assigned IPv4 address until the reservation expires. The reverse of this process happens for return traffic.
+From then on, all subsequent packets coming from that same IPv6 host will be NATed through the assigned IPv4 address until the reservation period expires. Likewise, a similar process occurs for return traffic.
 
-Hosts that require a stable IPv4 address may be assigned a static mapping in the configuration file.
+For hosts that necessitate a consistent IPv4 address, it is possible to configure a static mapping in the configuration file. This ensures it always communicates using the same IPv4 address no matter how long it is offline for. This is useful for single-stack hosts that need IPv4 DNS entries.
 
 ## Configuration
 

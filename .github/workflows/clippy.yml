@@ -2,6 +2,10 @@ name: Clippy check
 
 on:
   push:
+    paths: 
+      - '.github/workflows/clippy.yml'
+      - '**/Cargo.toml'
+      - '**/*.rs'
 
 permissions:
     checks: write

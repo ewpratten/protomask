@@ -43,11 +43,13 @@ lazy_static = "1.4.0"
 name = "protomask"
 path = "src/cli/main.rs"
 
-[package.metadata.rpm]
-package = "protomask"
-
-[package.metadata.rpm.cargo]
-buildflags = ["--release"]
-
-[package.metadata.rpm.targets]
-protomask = { path = "/usr/bin/protomask" }
+[package.metadata.deb]
+section = "network"
+assets = [
+    ["target/release/protomask", "usr/local/bin/", "755"],
+    ["etc/protomask.toml", "etc", "644"]
+]
+conf-files = ["/etc/protomask.toml"]
+depends = []
+maintainer-scripts = "debian/"
+systemd-units = { enable = false }

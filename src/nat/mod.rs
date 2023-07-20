@@ -9,7 +9,7 @@ use crate::{
 use self::{
     error::Nat64Error,
     table::Nat64Table,
-    utils::{embed_address, extract_address},
+    utils::{embed_address, extract_address, unwrap_log},
 };
 use ipnet::{Ipv4Net, Ipv6Net};
 use protomask_tun::TunDevice;
@@ -99,11 +99,14 @@ impl Nat64 {
 
                             // Spawn a task to process the packet
                             tokio::spawn(async move {
-                                let output =
-                                    translate_ipv4_to_ipv6(packet, new_source, new_destination)
-                                        .unwrap();
-                                tx.send(output.into()).await.unwrap();
-                                PACKET_COUNTER.with_label_values(&["ipv6", "sent"]).inc();
+                                if let Some(output) = unwrap_log(translate_ipv4_to_ipv6(
+                                    packet,
+                                    new_source,
+                                    new_destination,
+                                )) {
+                                    tx.send(output.into()).await.unwrap();
+                                    PACKET_COUNTER.with_label_values(&["ipv6", "sent"]).inc();
+                                }
                             });
                         }
                         6 => {
@@ -145,11 +148,14 @@ impl Nat64 {
 
                             // Spawn a task to process the packet
                             tokio::spawn(async move {
-                                let output =
-                                    translate_ipv6_to_ipv4(packet, new_source, new_destination)
-                                        .unwrap();
-                                tx.send(output.into()).await.unwrap();
-                                PACKET_COUNTER.with_label_values(&["ipv4", "sent"]).inc();
+                                if let Some(output) = unwrap_log(translate_ipv6_to_ipv4(
+                                    packet,
+                                    new_source,
+                                    new_destination,
+                                )) {
+                                    tx.send(output.into()).await.unwrap();
+                                    PACKET_COUNTER.with_label_values(&["ipv4", "sent"]).inc();
+                                }
                             });
                         }
                         n => {

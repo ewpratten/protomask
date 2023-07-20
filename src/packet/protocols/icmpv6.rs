@@ -50,7 +50,7 @@ where
     ) -> Result<Self, PacketError> {
         // Parse the packet
         let packet = pnet_packet::icmpv6::Icmpv6Packet::new(bytes)
-            .ok_or(PacketError::TooShort(bytes.len()))?;
+            .ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
 
         // Return the packet
         Ok(Self {
@@ -72,7 +72,7 @@ impl Icmpv6Packet<RawBytes> {
     ) -> Result<Self, PacketError> {
         // Parse the packet
         let packet = pnet_packet::icmpv6::Icmpv6Packet::new(bytes)
-            .ok_or(PacketError::TooShort(bytes.len()))?;
+            .ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
 
         // Return the packet
         Ok(Self {

@@ -42,7 +42,9 @@ Protomask can be installed using various methods:
 
 ### Using pre-built binaries
 
-Head over to the [releases](https://github.com/ewpratten/protomask/releases) page and download the latest release for your platform. This will contain a binary and example config file to get you started.
+Head over to the [releases](https://github.com/ewpratten/protomask/releases) page and download the latest release for your platform. 
+
+This will contain a binary and example config file to get you started.
 
 ### Using Cargo
 

@@ -6,7 +6,6 @@ use std::{
     time::Duration,
 };
 
-use colored::Colorize;
 use ipnet::{Ipv4Net, Ipv6Net};
 
 /// A static mapping rule
@@ -74,8 +73,8 @@ impl Config {
             Err(e) => {
                 eprintln!(
                     "Failed to parse config file due to:\n {}\n at {}",
-                    e.inner().message().bright_red(),
-                    e.path().to_string().bright_cyan()
+                    e.inner().message(),
+                    e.path()
                 );
                 std::process::exit(1);
             }

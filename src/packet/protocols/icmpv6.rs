@@ -42,6 +42,7 @@ where
     T: From<Vec<u8>>,
 {
     /// Construct a new ICMPv6 packet from raw bytes
+    #[allow(dead_code)]
     pub fn new_from_bytes(
         bytes: &[u8],
         source_address: Ipv6Addr,

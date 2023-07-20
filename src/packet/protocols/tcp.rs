@@ -58,6 +58,7 @@ impl<T> TcpPacket<T> {
     }
 
     // Set a new source
+    #[allow(dead_code)]
     pub fn set_source(&mut self, source: SocketAddr) -> Result<(), PacketError> {
         // Ensure the source and destination addresses are the same type
         if source.is_ipv4() != self.destination.is_ipv4() {
@@ -74,6 +75,7 @@ impl<T> TcpPacket<T> {
     }
 
     // Set a new destination
+    #[allow(dead_code)]
     pub fn set_destination(&mut self, destination: SocketAddr) -> Result<(), PacketError> {
         // Ensure the source and destination addresses are the same type
         if self.source.is_ipv4() != destination.is_ipv4() {
@@ -113,6 +115,7 @@ where
     T: From<Vec<u8>>,
 {
     /// Construct a new TCP packet from bytes
+    #[allow(dead_code)]
     pub fn new_from_bytes(
         bytes: &[u8],
         source_address: IpAddr,

@@ -1,0 +1,5 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2021-0124" # See issue #3
+]
+informational_warnings = ["unmaintained"]

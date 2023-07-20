@@ -25,6 +25,9 @@ Protomask uses a [TOML](https://toml.io) configuration file. Here is a functiona
 # The NAT64 prefix to route to protomask
 Nat64Prefix = "64:ff9b::/96"
 
+# Optionally enable prometheus metrics on a port
+Prometheus = "[::]:8080" # Optional, defaults to disabled
+
 [Pool]
 # All prefixes in the pool
 Prefixes = ["192.0.2.0/24"]

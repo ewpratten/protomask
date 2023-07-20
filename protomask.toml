@@ -1,7 +1,7 @@
-# Protomask example configuraiton file
-
 # The NAT64 prefix to route to protomask
 Nat64Prefix = "64:ff9b::/96"
+# Setting this will enable prometheus metrics
+Prometheus = "[::]:8080" # Optional, defaults to disabled
 
 [Pool]
 # All prefixes in the pool

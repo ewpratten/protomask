@@ -24,6 +24,8 @@ Protomask uses a [TOML](https://toml.io) configuration file. Here is a functiona
 ```toml
 # The NAT64 prefix to route to protomask
 Nat64Prefix = "64:ff9b::/96"
+# Setting this will enable prometheus metrics
+Prometheus = "[::]:8080" # Optional, defaults to disabled
 
 [Pool]
 # All prefixes in the pool
@@ -38,18 +40,14 @@ Static = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]
 
 Protomask can be installed using various methods:
 
+### Using pre-built binaries
+
+Head over to the [releases](https://github.com/ewpratten/protomask/releases) page and download the latest release for your platform. This will contain a binary and example config file to get you started.
+
 ### Using Cargo
 
 ```bash
 cargo install protomask
-```
-
-### From source
-
-```bash
-git clone https://github.com/ewpratten/protomask
-cd protomask
-cargo install --path .
 ```
 
 ## Usage

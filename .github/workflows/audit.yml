@@ -6,6 +6,7 @@ on:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
       - '.github/workflows/audit.yml'
+      - '**/audit.toml'
   schedule:
     - cron: '0 0 * * *'
 

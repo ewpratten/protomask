@@ -47,14 +47,6 @@ Protomask can be installed using various methods:
 cargo install protomask
 ```
 
-### From source
-
-```bash
-git clone https://github.com/ewpratten/protomask
-cd protomask
-cargo install --path .
-```
-
 ## Usage
 
 ```text

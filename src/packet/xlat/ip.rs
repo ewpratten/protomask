@@ -121,7 +121,7 @@ pub fn translate_ipv6_to_ipv4(
         new_source,
         new_destination,
         vec![],
-        new_payload.unwrap_or_else(Vec::new),
+        new_payload.unwrap_or_default(),
     );
 
     // Return the output

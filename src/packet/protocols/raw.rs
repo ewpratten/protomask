@@ -11,8 +11,8 @@ impl TryFrom<Vec<u8>> for RawBytes {
     }
 }
 
-impl Into<Vec<u8>> for RawBytes {
-    fn into(self) -> Vec<u8> {
-        self.0
+impl From<RawBytes> for Vec<u8> {
+    fn from(val: RawBytes) -> Self {
+        val.0
     }
 }

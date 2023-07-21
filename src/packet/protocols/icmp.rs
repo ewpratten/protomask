@@ -43,13 +43,13 @@ where
     }
 }
 
-impl<T> Into<Vec<u8>> for IcmpPacket<T>
+impl<T> From<IcmpPacket<T>> for Vec<u8>
 where
     T: Into<Vec<u8>>,
 {
-    fn into(self) -> Vec<u8> {
+    fn from(packet: IcmpPacket<T>) -> Self {
         // Convert the payload into raw bytes
-        let payload: Vec<u8> = self.payload.into();
+        let payload: Vec<u8> = packet.payload.into();
 
         // Allocate a mutable packet to write into
         let total_length =
@@ -58,8 +58,8 @@ where
             pnet_packet::icmp::MutableIcmpPacket::owned(vec![0u8; total_length]).unwrap();
 
         // Write the type and code
-        output.set_icmp_type(self.icmp_type);
-        output.set_icmp_code(self.icmp_code);
+        output.set_icmp_type(packet.icmp_type);
+        output.set_icmp_code(packet.icmp_code);
 
         // Write the payload
         output.set_payload(&payload);

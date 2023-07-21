@@ -141,13 +141,13 @@ impl UdpPacket<RawBytes> {
     }
 }
 
-impl<T> Into<Vec<u8>> for UdpPacket<T>
+impl<T> From<UdpPacket<T>> for Vec<u8>
 where
     T: Into<Vec<u8>>,
 {
-    fn into(self) -> Vec<u8> {
+    fn from(packet: UdpPacket<T>) -> Self {
         // Convert the payload into raw bytes
-        let payload: Vec<u8> = self.payload.into();
+        let payload: Vec<u8> = packet.payload.into();
 
         // Allocate a mutable packet to write into
         let total_length =
@@ -156,8 +156,8 @@ where
             pnet_packet::udp::MutableUdpPacket::owned(vec![0u8; total_length]).unwrap();
 
         // Write the source and dest ports
-        output.set_source(self.source.port());
-        output.set_destination(self.destination.port());
+        output.set_source(packet.source.port());
+        output.set_destination(packet.destination.port());
 
         // Write the length
         output.set_length(total_length as u16);
@@ -167,7 +167,7 @@ where
 
         // Calculate the checksum
         output.set_checksum(0);
-        output.set_checksum(match (self.source.ip(), self.destination.ip()) {
+        output.set_checksum(match (packet.source.ip(), packet.destination.ip()) {
             (IpAddr::V4(source_ip), IpAddr::V4(destination_ip)) => {
                 pnet_packet::udp::ipv4_checksum(&output.to_immutable(), &source_ip, &destination_ip)
             }

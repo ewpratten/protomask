@@ -5,7 +5,7 @@ use std::{
 };
 
 use bimap::BiHashMap;
-use ipnet::{Ipv4Net, Ipv6Net};
+use ipnet::Ipv4Net;
 
 use crate::metrics::{IPV4_POOL_RESERVED, IPV4_POOL_SIZE};
 
@@ -136,61 +136,6 @@ impl Nat64Table {
         // Otherwise, there is no matching reservation
         Err(TableError::NoIpv6Mapping(ipv4))
     }
-
-    /// Check if an address is within the IPv4 pool
-    pub fn is_address_within_pool(&self, address: &Ipv4Addr) -> bool {
-        self.ipv4_pool.iter().any(|net| net.contains(address))
-    }
-
-    /// Calculate the translated version of any address
-    pub fn calculate_xlat_addr(
-        &mut self,
-        input: &IpAddr,
-        ipv6_nat64_prefix: &Ipv6Net,
-    ) -> Result<IpAddr, TableError> {
-        // Handle the incoming address type
-        match input {
-            // Handle IPv4
-            IpAddr::V4(ipv4_addr) => {
-                // If the address is in the IPv4 pool, it is a regular IPv4 address
-                if self.is_address_within_pool(ipv4_addr) {
-                    // This means we need to pass through to `get_reverse`
-                    return Ok(IpAddr::V6(self.get_reverse(*ipv4_addr)?));
-                }
-
-                // Otherwise, it shall be embedded inside the ipv6 prefix
-                let prefix_octets = ipv6_nat64_prefix.addr().octets();
-                let address_octets = ipv4_addr.octets();
-                return Ok(IpAddr::V6(Ipv6Addr::new(
-                    u16::from_be_bytes([prefix_octets[0], prefix_octets[1]]),
-                    u16::from_be_bytes([prefix_octets[2], prefix_octets[3]]),
-                    u16::from_be_bytes([prefix_octets[4], prefix_octets[5]]),
-                    u16::from_be_bytes([prefix_octets[6], prefix_octets[7]]),
-                    u16::from_be_bytes([prefix_octets[8], prefix_octets[9]]),
-                    u16::from_be_bytes([prefix_octets[10], prefix_octets[11]]),
-                    u16::from_be_bytes([address_octets[0], address_octets[1]]),
-                    u16::from_be_bytes([address_octets[2], address_octets[3]]),
-                )));
-            }
-
-            // Handle IPv6
-            IpAddr::V6(ipv6_addr) => {
-                // If the address is in the IPv6 prefix, it is an embedded IPv4 address
-                if ipv6_nat64_prefix.contains(ipv6_addr) {
-                    let address_bytes = ipv6_addr.octets();
-                    return Ok(IpAddr::V4(Ipv4Addr::new(
-                        address_bytes[12],
-                        address_bytes[13],
-                        address_bytes[14],
-                        address_bytes[15],
-                    )));
-                }
-
-                // Otherwise, it is a regular IPv6 address and we can pass through to `get_or_assign_ipv4`
-                return Ok(IpAddr::V4(self.get_or_assign_ipv4(*ipv6_addr)?));
-            }
-        }
-    }
 }
 
 impl Nat64Table {
@@ -200,16 +145,12 @@ impl Nat64Table {
 
         // Prune from the reservation map
         self.reservations.retain(|v6, v4| {
-            if let Some(time) = self.reservation_times.get(&(*v6, *v4)) {
-                if let Some(time) = time {
-                    let keep = now - *time < self.reservation_timeout;
-                    if !keep {
-                        log::info!("Pruned reservation: {} -> {}", v6, v4);
-                    }
-                    keep
-                } else {
-                    true
+            if let Some(Some(time)) = self.reservation_times.get(&(*v6, *v4)) {
+                let keep = now - *time < self.reservation_timeout;
+                if !keep {
+                    log::info!("Pruned reservation: {} -> {}", v6, v4);
                 }
+                keep
             } else {
                 true
             }

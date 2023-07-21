@@ -24,6 +24,7 @@ pub struct TcpPacket<T> {
 
 impl<T> TcpPacket<T> {
     /// Construct a new TCP packet
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         source: SocketAddr,
         destination: SocketAddr,
@@ -105,7 +106,7 @@ impl<T> TcpPacket<T> {
     fn options_length(&self) -> usize {
         self.options
             .iter()
-            .map(|option| TcpOptionPacket::packet_size(option))
+            .map(TcpOptionPacket::packet_size)
             .sum::<usize>()
     }
 }
@@ -139,7 +140,7 @@ where
             destination: SocketAddr::new(destination_address, parsed.get_destination()),
             sequence: parsed.get_sequence(),
             ack_number: parsed.get_acknowledgement(),
-            flags: parsed.get_flags() as u8,
+            flags: parsed.get_flags(),
             window_size: parsed.get_window(),
             urgent_pointer: parsed.get_urgent_ptr(),
             options: parsed.get_options().to_vec(),
@@ -173,7 +174,7 @@ impl TcpPacket<RawBytes> {
             destination: SocketAddr::new(destination_address, parsed.get_destination()),
             sequence: parsed.get_sequence(),
             ack_number: parsed.get_acknowledgement(),
-            flags: parsed.get_flags() as u8,
+            flags: parsed.get_flags(),
             window_size: parsed.get_window(),
             urgent_pointer: parsed.get_urgent_ptr(),
             options: parsed.get_options().to_vec(),
@@ -182,16 +183,16 @@ impl TcpPacket<RawBytes> {
     }
 }
 
-impl<T> Into<Vec<u8>> for TcpPacket<T>
+impl<T> From<TcpPacket<T>> for Vec<u8>
 where
     T: Into<Vec<u8>>,
 {
-    fn into(self) -> Vec<u8> {
+    fn from(packet: TcpPacket<T>) -> Self {
         // Get the options length in words
-        let options_length = self.options_length();
+        let options_length = packet.options_length();
 
         // Convert the payload into raw bytes
-        let payload: Vec<u8> = self.payload.into();
+        let payload: Vec<u8> = packet.payload.into();
 
         // Allocate a mutable packet to write into
         let total_length = pnet_packet::tcp::MutableTcpPacket::minimum_packet_size()
@@ -201,34 +202,34 @@ where
             pnet_packet::tcp::MutableTcpPacket::owned(vec![0u8; total_length]).unwrap();
 
         // Write the source and dest ports
-        output.set_source(self.source.port());
-        output.set_destination(self.destination.port());
+        output.set_source(packet.source.port());
+        output.set_destination(packet.destination.port());
 
         // Write the sequence and ack numbers
-        output.set_sequence(self.sequence);
-        output.set_acknowledgement(self.ack_number);
+        output.set_sequence(packet.sequence);
+        output.set_acknowledgement(packet.ack_number);
 
         // Write the offset
         output.set_data_offset(5 + (options_length / 4) as u8);
 
         // Write the options
-        output.set_options(&self.options);
+        output.set_options(&packet.options);
 
         // Write the flags
-        output.set_flags(self.flags.into());
+        output.set_flags(packet.flags);
 
         // Write the window size
-        output.set_window(self.window_size);
+        output.set_window(packet.window_size);
 
         // Write the urgent pointer
-        output.set_urgent_ptr(self.urgent_pointer);
+        output.set_urgent_ptr(packet.urgent_pointer);
 
         // Write the payload
         output.set_payload(&payload);
 
         // Calculate the checksum
         output.set_checksum(0);
-        output.set_checksum(match (self.source.ip(), self.destination.ip()) {
+        output.set_checksum(match (packet.source.ip(), packet.destination.ip()) {
             (IpAddr::V4(source_ip), IpAddr::V4(destination_ip)) => {
                 pnet_packet::tcp::ipv4_checksum(&output.to_immutable(), &source_ip, &destination_ip)
             }

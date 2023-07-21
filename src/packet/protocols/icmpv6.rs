@@ -85,13 +85,13 @@ impl Icmpv6Packet<RawBytes> {
     }
 }
 
-impl<T> Into<Vec<u8>> for Icmpv6Packet<T>
+impl<T> From<Icmpv6Packet<T>> for Vec<u8>
 where
     T: Into<Vec<u8>>,
 {
-    fn into(self) -> Vec<u8> {
+    fn from(packet: Icmpv6Packet<T>) -> Self {
         // Convert the payload into raw bytes
-        let payload: Vec<u8> = self.payload.into();
+        let payload: Vec<u8> = packet.payload.into();
 
         // Allocate a mutable packet to write into
         let total_length =
@@ -100,8 +100,8 @@ where
             pnet_packet::icmpv6::MutableIcmpv6Packet::owned(vec![0u8; total_length]).unwrap();
 
         // Write the type and code
-        output.set_icmpv6_type(self.icmp_type);
-        output.set_icmpv6_code(self.icmp_code);
+        output.set_icmpv6_type(packet.icmp_type);
+        output.set_icmpv6_code(packet.icmp_code);
 
         // Write the payload
         output.set_payload(&payload);
@@ -110,8 +110,8 @@ where
         output.set_checksum(0);
         output.set_checksum(pnet_packet::icmpv6::checksum(
             &output.to_immutable(),
-            &self.source_address,
-            &self.destination_address,
+            &packet.source_address,
+            &packet.destination_address,
         ));
 
         // Return the raw bytes

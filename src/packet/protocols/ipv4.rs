@@ -25,6 +25,7 @@ pub struct Ipv4Packet<T> {
 
 impl<T> Ipv4Packet<T> {
     /// Construct a new IPv4 packet
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dscp: u8,
         ecn: u8,
@@ -70,8 +71,8 @@ where
 
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
-        let packet =
-            pnet_packet::ipv4::Ipv4Packet::new(&bytes).ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
+        let packet = pnet_packet::ipv4::Ipv4Packet::new(&bytes)
+            .ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
 
         // Return the packet
         Ok(Self {
@@ -90,42 +91,42 @@ where
     }
 }
 
-impl<T> Into<Vec<u8>> for Ipv4Packet<T>
+impl<T> From<Ipv4Packet<T>> for Vec<u8>
 where
     T: Into<Vec<u8>> + Clone,
 {
-    fn into(self) -> Vec<u8> {
+    fn from(packet: Ipv4Packet<T>) -> Self {
         // Convert the payload into raw bytes
-        let payload: Vec<u8> = self.payload.clone().into();
+        let payload: Vec<u8> = packet.payload.clone().into();
 
         // Build the packet
-        let total_length = 20 + (self.options_length_words() as usize * 4) + payload.len();
-        let mut packet =
+        let total_length = 20 + (packet.options_length_words() as usize * 4) + payload.len();
+        let mut output =
             pnet_packet::ipv4::MutableIpv4Packet::owned(vec![0u8; total_length]).unwrap();
 
         // Set the fields
-        packet.set_version(4);
-        packet.set_header_length(5 + self.options_length_words());
-        packet.set_dscp(self.dscp);
-        packet.set_ecn(self.ecn);
-        packet.set_total_length(total_length.try_into().unwrap());
-        packet.set_identification(self.identification);
-        packet.set_flags(self.flags);
-        packet.set_fragment_offset(self.fragment_offset);
-        packet.set_ttl(self.ttl);
-        packet.set_next_level_protocol(self.protocol);
-        packet.set_source(self.source_address);
-        packet.set_destination(self.destination_address);
-        packet.set_options(&self.options);
+        output.set_version(4);
+        output.set_header_length(5 + packet.options_length_words());
+        output.set_dscp(packet.dscp);
+        output.set_ecn(packet.ecn);
+        output.set_total_length(total_length.try_into().unwrap());
+        output.set_identification(packet.identification);
+        output.set_flags(packet.flags);
+        output.set_fragment_offset(packet.fragment_offset);
+        output.set_ttl(packet.ttl);
+        output.set_next_level_protocol(packet.protocol);
+        output.set_source(packet.source_address);
+        output.set_destination(packet.destination_address);
+        output.set_options(&packet.options);
 
         // Set the payload
-        packet.set_payload(&payload);
+        output.set_payload(&payload);
 
         // Calculate the checksum
-        packet.set_checksum(0);
-        packet.set_checksum(pnet_packet::ipv4::checksum(&packet.to_immutable()));
+        output.set_checksum(0);
+        output.set_checksum(pnet_packet::ipv4::checksum(&output.to_immutable()));
 
         // Return the packet
-        packet.to_immutable().packet().to_vec()
+        output.to_immutable().packet().to_vec()
     }
 }

@@ -70,7 +70,7 @@ pub fn translate_ipv4_to_ipv6(
 
 /// Translates an IPv6 packet to an IPv4 packet
 pub fn translate_ipv6_to_ipv4(
-    input: Ipv6Packet<Vec<u8>>,
+    input: &Ipv6Packet<Vec<u8>>,
     new_source: Ipv4Addr,
     new_destination: Ipv4Addr,
 ) -> Result<Ipv4Packet<Vec<u8>>, PacketError> {

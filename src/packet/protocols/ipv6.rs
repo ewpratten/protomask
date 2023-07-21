@@ -47,7 +47,7 @@ where
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
         let packet = pnet_packet::ipv6::Ipv6Packet::new(&bytes)
-            .ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
+            .ok_or(PacketError::TooShort(bytes.len(), bytes.clone()))?;
 
         // Return the packet
         Ok(Self {
@@ -80,7 +80,7 @@ where
         output.set_version(6);
         output.set_traffic_class(packet.traffic_class);
         output.set_flow_label(packet.flow_label);
-        output.set_payload_length(payload.len() as u16);
+        output.set_payload_length(u16::try_from(payload.len()).unwrap());
         output.set_next_header(packet.next_header);
         output.set_hop_limit(packet.hop_limit);
         output.set_source(packet.source_address);

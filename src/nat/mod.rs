@@ -44,7 +44,7 @@ impl Nat64 {
         interface.add_route(ipv6_nat_prefix.into()).await?;
 
         // Add the IPv4 pool prefixes as routes
-        for ipv4_prefix in ipv4_pool.iter() {
+        for ipv4_prefix in &ipv4_pool {
             interface.add_route((*ipv4_prefix).into()).await?;
         }
 
@@ -149,7 +149,7 @@ impl Nat64 {
                             // Spawn a task to process the packet
                             tokio::spawn(async move {
                                 if let Some(output) = unwrap_log(translate_ipv6_to_ipv4(
-                                    packet,
+                                    &packet,
                                     new_source,
                                     new_destination,
                                 )) {
@@ -169,7 +169,7 @@ impl Nat64 {
                         log::warn!("Translator running behind! Dropping {} packets", count);
                         Ok(())
                     }
-                    error => Err(error),
+                    error @ broadcast::error::RecvError::Closed => Err(error),
                 },
             }?;
         }

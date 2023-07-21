@@ -1,3 +1,5 @@
+#![allow(clippy::doc_markdown)]
+
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use pnet_packet::{icmp::IcmpTypes, icmpv6::Icmpv6Types};
@@ -92,7 +94,7 @@ pub fn translate_icmpv6_to_icmp(
 
             // Translate
             let inner_payload =
-                translate_ipv6_to_ipv4(inner_payload.try_into()?, new_source, new_destination)?;
+                translate_ipv6_to_ipv4(&inner_payload.try_into()?, new_source, new_destination)?;
             let inner_payload: Vec<u8> = inner_payload.into();
 
             // Build the new payload

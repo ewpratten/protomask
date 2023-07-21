@@ -160,7 +160,7 @@ where
         output.set_destination(packet.destination.port());
 
         // Write the length
-        output.set_length(total_length as u16);
+        output.set_length(u16::try_from(total_length).unwrap());
 
         // Write the payload
         output.set_payload(&payload);

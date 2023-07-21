@@ -13,7 +13,7 @@ pub struct IcmpPacket<T> {
 }
 
 impl<T> IcmpPacket<T> {
-    /// Construct a new ICMPv6 packet
+    /// Construct a new `ICMP` packet
     pub fn new(icmp_type: IcmpType, icmp_code: IcmpCode, payload: T) -> Self {
         Self {
             icmp_type,
@@ -32,7 +32,7 @@ where
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
         let packet = pnet_packet::icmp::IcmpPacket::new(&bytes)
-            .ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
+            .ok_or(PacketError::TooShort(bytes.len(), bytes.clone()))?;
 
         // Return the packet
         Ok(Self {

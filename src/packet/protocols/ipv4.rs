@@ -54,6 +54,7 @@ impl<T> Ipv4Packet<T> {
         }
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn options_length_words(&self) -> u8 {
         self.options
             .iter()
@@ -72,7 +73,7 @@ where
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
         let packet = pnet_packet::ipv4::Ipv4Packet::new(&bytes)
-            .ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
+            .ok_or(PacketError::TooShort(bytes.len(), bytes.clone()))?;
 
         // Return the packet
         Ok(Self {

@@ -19,7 +19,7 @@ pub struct Icmpv6Packet<T> {
 }
 
 impl<T> Icmpv6Packet<T> {
-    /// Construct a new ICMPv6 packet
+    /// Construct a new `ICMPv6` packet
     pub fn new(
         source_address: Ipv6Addr,
         destination_address: Ipv6Addr,
@@ -41,7 +41,7 @@ impl<T> Icmpv6Packet<T>
 where
     T: From<Vec<u8>>,
 {
-    /// Construct a new ICMPv6 packet from raw bytes
+    /// Construct a new `ICMPv6` packet from raw bytes
     #[allow(dead_code)]
     pub fn new_from_bytes(
         bytes: &[u8],
@@ -64,7 +64,7 @@ where
 }
 
 impl Icmpv6Packet<RawBytes> {
-    /// Construct a new ICMPv6 packet with a raw payload from raw bytes
+    /// Construct a new `ICMPv6` packet with a raw payload from raw bytes
     pub fn new_from_bytes_raw_payload(
         bytes: &[u8],
         source_address: Ipv6Addr,

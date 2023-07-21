@@ -103,11 +103,12 @@ impl<T> TcpPacket<T> {
     }
 
     /// Get the length of the options in words
-    fn options_length(&self) -> usize {
+    #[allow(clippy::cast_possible_truncation)]
+    fn options_length(&self) -> u8 {
         self.options
             .iter()
-            .map(TcpOptionPacket::packet_size)
-            .sum::<usize>()
+            .map(|option| TcpOptionPacket::packet_size(option) as u8)
+            .sum::<u8>()
     }
 }
 
@@ -143,7 +144,7 @@ where
             flags: parsed.get_flags(),
             window_size: parsed.get_window(),
             urgent_pointer: parsed.get_urgent_ptr(),
-            options: parsed.get_options().to_vec(),
+            options: parsed.get_options().clone(),
             payload: parsed.payload().to_vec().into(),
         })
     }
@@ -177,7 +178,7 @@ impl TcpPacket<RawBytes> {
             flags: parsed.get_flags(),
             window_size: parsed.get_window(),
             urgent_pointer: parsed.get_urgent_ptr(),
-            options: parsed.get_options().to_vec(),
+            options: parsed.get_options().clone(),
             payload: RawBytes(parsed.payload().to_vec()),
         })
     }
@@ -196,7 +197,7 @@ where
 
         // Allocate a mutable packet to write into
         let total_length = pnet_packet::tcp::MutableTcpPacket::minimum_packet_size()
-            + options_length
+            + options_length as usize
             + payload.len();
         let mut output =
             pnet_packet::tcp::MutableTcpPacket::owned(vec![0u8; total_length]).unwrap();
@@ -210,7 +211,7 @@ where
         output.set_acknowledgement(packet.ack_number);
 
         // Write the offset
-        output.set_data_offset(5 + (options_length / 4) as u8);
+        output.set_data_offset(5 + (options_length / 4));
 
         // Write the options
         output.set_options(&packet.options);

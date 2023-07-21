@@ -176,10 +176,10 @@ impl Nat64Table {
         // Track the values
         IPV4_POOL_RESERVED
             .with_label_values(&["dynamic"])
-            .set(total_dynamic_reservations as i64);
+            .set(i64::from(total_dynamic_reservations));
         IPV4_POOL_RESERVED
             .with_label_values(&["static"])
-            .set(total_static_reservations as i64);
+            .set(i64::from(total_static_reservations));
     }
 }
 

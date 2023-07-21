@@ -1,15 +1,15 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Nat64Error {
     #[error(transparent)]
-    TableError(#[from] super::table::TableError),
+    Table(#[from] super::table::TableError),
     #[error(transparent)]
-    TunError(#[from] protomask_tun::Error),
+    Tun(#[from] protomask_tun::Error),
     #[error(transparent)]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
     #[error(transparent)]
-    PacketHandlingError(#[from] crate::packet::error::PacketError),
+    PacketHandling(#[from] crate::packet::error::PacketError),
     #[error(transparent)]
-    PacketReceiveError(#[from] tokio::sync::broadcast::error::RecvError),
+    PacketReceive(#[from] tokio::sync::broadcast::error::RecvError),
     #[error(transparent)]
-    PacketSendError(#[from] tokio::sync::mpsc::error::SendError<Vec<u8>>),
+    PacketSend(#[from] tokio::sync::mpsc::error::SendError<Vec<u8>>),
 }

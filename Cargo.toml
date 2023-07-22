@@ -47,7 +47,8 @@ path = "src/cli/main.rs"
 section = "network"
 assets = [
     ["target/release/protomask", "/usr/local/bin/protomask", "755"],
-    ["./protomask.toml", "/etc/protomask.toml", "644"]
+    ["./protomask.toml", "/etc/protomask.toml", "644"],
+    ["README.md", "usr/share/doc/protomask/README.md", "644"]
 ]
 conf-files = ["/etc/protomask.toml"]
 depends = []

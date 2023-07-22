@@ -27,12 +27,12 @@ Protomask uses a [TOML](https://toml.io) configuration file. Here is a functiona
 # The NAT64 prefix to route to protomask
 Nat64Prefix = "64:ff9b::/96"
 # Setting this will enable prometheus metrics
-Prometheus = "[::]:8080" # Optional, defaults to disabled
+Prometheus = "[::1]:8080" # Optional, defaults to disabled
 
 [Pool]
 # All prefixes in the pool
 Prefixes = ["192.0.2.0/24"]
-# The maximum duration a prefix will be reserved for after becoming idle
+# The maximum duration an ipv4 address from the pool will be reserved for after becoming idle
 MaxIdleDuration = 7200 # Optional, seconds. Defaults to 7200 (2 hours)
 # Permanent address mappings
 Static = [{ v4 = "192.0.2.2", v6 = "2001:db8:1::2" }]

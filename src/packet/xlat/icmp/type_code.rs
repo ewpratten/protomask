@@ -1,5 +1,7 @@
 //! Functions to map between ICMP and ICMPv6 types/codes
 
+#![allow(clippy::doc_markdown)]
+
 use pnet_packet::{
     icmp::{destination_unreachable, IcmpCode, IcmpType, IcmpTypes},
     icmpv6::{Icmpv6Code, Icmpv6Type, Icmpv6Types},
@@ -8,6 +10,7 @@ use pnet_packet::{
 use crate::packet::error::PacketError;
 
 /// Best effort translation from an ICMP type and code to an ICMPv6 type and code
+#[allow(clippy::deprecated_cfg_attr)]
 pub fn translate_type_and_code_4_to_6(
     icmp_type: IcmpType,
     icmp_code: IcmpCode,
@@ -29,6 +32,7 @@ pub fn translate_type_and_code_4_to_6(
         (IcmpTypes::DestinationUnreachable, icmp_code) => Ok((
             Icmpv6Types::DestinationUnreachable,
             #[cfg_attr(rustfmt, rustfmt_skip)]
+            #[allow(clippy::match_same_arms)]
             Icmpv6Code(match icmp_code {
                 destination_unreachable::IcmpCodes::DestinationHostUnreachable => 3,
                 destination_unreachable::IcmpCodes::DestinationProtocolUnreachable => 4,
@@ -55,6 +59,7 @@ pub fn translate_type_and_code_4_to_6(
 }
 
 /// Best effort translation from an ICMPv6 type and code to an ICMP type and code
+#[allow(clippy::deprecated_cfg_attr)]
 pub fn translate_type_and_code_6_to_4(
     icmp_type: Icmpv6Type,
     icmp_code: Icmpv6Code,
@@ -76,6 +81,7 @@ pub fn translate_type_and_code_6_to_4(
         (Icmpv6Types::DestinationUnreachable, icmp_code) => Ok((
             IcmpTypes::DestinationUnreachable,
             #[cfg_attr(rustfmt, rustfmt_skip)]
+            #[allow(clippy::match_same_arms)]
             match icmp_code.0 {
                 1 => destination_unreachable::IcmpCodes::CommunicationAdministrativelyProhibited,
                 2 => destination_unreachable::IcmpCodes::SourceHostIsolated,

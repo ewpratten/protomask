@@ -13,7 +13,7 @@ pub struct IcmpPacket<T> {
 }
 
 impl<T> IcmpPacket<T> {
-    /// Construct a new ICMPv6 packet
+    /// Construct a new `ICMP` packet
     pub fn new(icmp_type: IcmpType, icmp_code: IcmpCode, payload: T) -> Self {
         Self {
             icmp_type,
@@ -32,7 +32,7 @@ where
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
         // Parse the packet
         let packet = pnet_packet::icmp::IcmpPacket::new(&bytes)
-            .ok_or(PacketError::TooShort(bytes.len(), bytes.to_vec()))?;
+            .ok_or(PacketError::TooShort(bytes.len(), bytes.clone()))?;
 
         // Return the packet
         Ok(Self {
@@ -43,13 +43,13 @@ where
     }
 }
 
-impl<T> Into<Vec<u8>> for IcmpPacket<T>
+impl<T> From<IcmpPacket<T>> for Vec<u8>
 where
     T: Into<Vec<u8>>,
 {
-    fn into(self) -> Vec<u8> {
+    fn from(packet: IcmpPacket<T>) -> Self {
         // Convert the payload into raw bytes
-        let payload: Vec<u8> = self.payload.into();
+        let payload: Vec<u8> = packet.payload.into();
 
         // Allocate a mutable packet to write into
         let total_length =
@@ -58,8 +58,8 @@ where
             pnet_packet::icmp::MutableIcmpPacket::owned(vec![0u8; total_length]).unwrap();
 
         // Write the type and code
-        output.set_icmp_type(self.icmp_type);
-        output.set_icmp_code(self.icmp_code);
+        output.set_icmp_type(packet.icmp_type);
+        output.set_icmp_code(packet.icmp_code);
 
         // Write the payload
         output.set_payload(&payload);

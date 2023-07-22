@@ -7,6 +7,7 @@ use hyper::{
 use prometheus::{Encoder, TextEncoder};
 
 /// Handle an HTTP request
+#[allow(clippy::unused_async)]
 async fn handle_request(request: Request<Body>) -> Result<Response<Body>, Infallible> {
     // If the request is targeting the metrics endpoint
     if request.method() == Method::GET && request.uri().path() == "/metrics" {
@@ -39,6 +40,6 @@ pub async fn serve_metrics(bind_addr: SocketAddr) {
 
     // Run the server
     if let Err(e) = server.await {
-        eprintln!("Metrics server error: {}", e);
+        eprintln!("Metrics server error: {e}");
     }
 }

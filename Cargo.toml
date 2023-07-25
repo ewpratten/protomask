@@ -38,6 +38,7 @@ rtnetlink = "0.13.0"
 futures = "0.3.28"
 prometheus = "0.13.3"
 lazy_static = "1.4.0"
+flexbuffers = "2.0.0"
 
 [[bin]]
 name = "protomask"

@@ -1,0 +1,4 @@
+[submodule "third_party/aya"]
+	path = third_party/aya
+	url = https://github.com/aya-rs/aya
+	ignore = dirty

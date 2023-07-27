@@ -1,0 +1,5 @@
+[target.bpfel-unknown-none]
+image = "protomask/bpfex-unknown-none"
+
+[target.bpfeb-unknown-none]
+image = "protomask/bpfex-unknown-none"

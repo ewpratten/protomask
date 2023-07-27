@@ -2,24 +2,40 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"type": "cargo",
-			"command": "build",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"target/x86_64-unknown-linux-musl/debug/protomask"
+			],
 			"problemMatcher": [
 				"$rustc",
 				"$rust-panic"
 			],
 			"group": "build",
-			"label": "rust: cargo build"
+			"label": "rust: build [target: x86_64-unknown-linux-musl]"
 		},
 		{
-			"type": "cargo",
-			"command": "test",
+			"type": "shell",
+			"command": "make",
+			"args": [
+				"target/x86_64-unknown-linux-musl/release/protomask"
+			],
 			"problemMatcher": [
 				"$rustc",
 				"$rust-panic"
 			],
-			"group": "test",
-			"label": "rust: cargo test"
-		} 
+			"group": "build",
+			"label": "rust: build [target: x86_64-unknown-linux-musl] [profile: release]"
+		},
+		// {
+		// 	"type": "cargo",
+		// 	"command": "test",
+		// 	"problemMatcher": [
+		// 		"$rustc",
+		// 		"$rust-panic"
+		// 	],
+		// 	"group": "test",
+		// 	"label": "rust: cargo test"
+		// } 
 	]
 }

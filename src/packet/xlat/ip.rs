@@ -7,7 +7,7 @@ use crate::{
     packet::{
         error::PacketError,
         protocols::{icmpv6::Icmpv6Packet, ipv4::Ipv4Packet, ipv6::Ipv6Packet, raw::RawBytes},
-    },
+    }, profiling::{PacketTimer, TimerScope},
 };
 
 use super::{
@@ -21,12 +21,16 @@ pub fn translate_ipv4_to_ipv6(
     input: Ipv4Packet<Vec<u8>>,
     new_source: Ipv6Addr,
     new_destination: Ipv6Addr,
+    timer: &mut PacketTimer
 ) -> Result<Ipv6Packet<Vec<u8>>, PacketError> {
+    // Start profiling this function
+    timer.start(TimerScope::Ipv4ToIpv6);
+
     // Perform recursive translation to determine the new payload
     let new_payload = match input.protocol {
         IpNextHeaderProtocols::Icmp => {
             let icmp_input: IcmpPacket<RawBytes> = input.payload.try_into()?;
-            translate_icmp_to_icmpv6(icmp_input, new_source, new_destination)?.into()
+            translate_icmp_to_icmpv6(icmp_input, new_source, new_destination, timer)?.into()
         }
         IpNextHeaderProtocols::Udp => {
             let udp_input: UdpPacket<RawBytes> = UdpPacket::new_from_bytes_raw_payload(
@@ -34,7 +38,7 @@ pub fn translate_ipv4_to_ipv6(
                 IpAddr::V4(input.source_address),
                 IpAddr::V4(input.destination_address),
             )?;
-            translate_udp4_to_udp6(udp_input, new_source, new_destination)?.into()
+            translate_udp4_to_udp6(udp_input, new_source, new_destination, timer)?.into()
         }
         IpNextHeaderProtocols::Tcp => {
             let tcp_input: TcpPacket<RawBytes> = TcpPacket::new_from_bytes_raw_payload(
@@ -42,7 +46,7 @@ pub fn translate_ipv4_to_ipv6(
                 IpAddr::V4(input.source_address),
                 IpAddr::V4(input.destination_address),
             )?;
-            translate_tcp4_to_tcp6(tcp_input, new_source, new_destination)?.into()
+            translate_tcp4_to_tcp6(tcp_input, new_source, new_destination, timer)?.into()
         }
         _ => {
             log::warn!("Unsupported next level protocol: {}", input.protocol);
@@ -64,6 +68,9 @@ pub fn translate_ipv4_to_ipv6(
         new_payload,
     );
 
+    // End the timer
+    timer.end(TimerScope::Ipv4ToIpv6);
+
     // Return the output
     Ok(output)
 }
@@ -73,7 +80,11 @@ pub fn translate_ipv6_to_ipv4(
     input: &Ipv6Packet<Vec<u8>>,
     new_source: Ipv4Addr,
     new_destination: Ipv4Addr,
+    timer: &mut PacketTimer
 ) -> Result<Ipv4Packet<Vec<u8>>, PacketError> {
+    // Start profiling this function
+    timer.start(TimerScope::Ipv6ToIpv4);
+
     // Perform recursive translation to determine the new payload
     let new_payload = match input.next_header {
         IpNextHeaderProtocols::Icmpv6 => {
@@ -82,7 +93,7 @@ pub fn translate_ipv6_to_ipv4(
                 input.source_address,
                 input.destination_address,
             )?;
-            Some(translate_icmpv6_to_icmp(icmpv6_input, new_source, new_destination)?.into())
+            Some(translate_icmpv6_to_icmp(icmpv6_input, new_source, new_destination, timer)?.into())
         }
         IpNextHeaderProtocols::Udp => {
             let udp_input: UdpPacket<RawBytes> = UdpPacket::new_from_bytes_raw_payload(
@@ -90,7 +101,7 @@ pub fn translate_ipv6_to_ipv4(
                 IpAddr::V6(input.source_address),
                 IpAddr::V6(input.destination_address),
             )?;
-            Some(translate_udp6_to_udp4(udp_input, new_source, new_destination)?.into())
+            Some(translate_udp6_to_udp4(udp_input, new_source, new_destination, timer)?.into())
         }
         IpNextHeaderProtocols::Tcp => {
             let tcp_input: TcpPacket<RawBytes> = TcpPacket::new_from_bytes_raw_payload(
@@ -98,7 +109,7 @@ pub fn translate_ipv6_to_ipv4(
                 IpAddr::V6(input.source_address),
                 IpAddr::V6(input.destination_address),
             )?;
-            Some(translate_tcp6_to_tcp4(tcp_input, new_source, new_destination)?.into())
+            Some(translate_tcp6_to_tcp4(tcp_input, new_source, new_destination, timer)?.into())
         }
         _ => {
             log::warn!("Unsupported next level protocol: {}", input.next_header);
@@ -123,6 +134,9 @@ pub fn translate_ipv6_to_ipv4(
         vec![],
         new_payload.unwrap_or_default(),
     );
+
+    // End the timer
+    timer.end(TimerScope::Ipv6ToIpv4);
 
     // Return the output
     Ok(output)

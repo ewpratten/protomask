@@ -1,18 +1,20 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-use crate::packet::{
+use crate::{packet::{
     error::PacketError,
     protocols::{raw::RawBytes, tcp::TcpPacket},
-};
+}, profiling::{PacketTimer, TimerScope}};
 
 /// Translates an IPv4 TCP packet to an IPv6 TCP packet
 pub fn translate_tcp4_to_tcp6(
     input: TcpPacket<RawBytes>,
     new_source_addr: Ipv6Addr,
     new_destination_addr: Ipv6Addr,
+    timer: &mut PacketTimer
 ) -> Result<TcpPacket<RawBytes>, PacketError> {
     // Build the packet
-    TcpPacket::new(
+    timer.start(TimerScope::Tcp);
+    let output = TcpPacket::new(
         SocketAddr::new(IpAddr::V6(new_source_addr), input.source().port()),
         SocketAddr::new(IpAddr::V6(new_destination_addr), input.destination().port()),
         input.sequence,
@@ -22,7 +24,9 @@ pub fn translate_tcp4_to_tcp6(
         input.urgent_pointer,
         input.options,
         input.payload,
-    )
+    );
+    timer.end(TimerScope::Tcp);
+    output
 }
 
 /// Translates an IPv6 TCP packet to an IPv4 TCP packet
@@ -30,9 +34,11 @@ pub fn translate_tcp6_to_tcp4(
     input: TcpPacket<RawBytes>,
     new_source_addr: Ipv4Addr,
     new_destination_addr: Ipv4Addr,
+    timer: &mut PacketTimer
 ) -> Result<TcpPacket<RawBytes>, PacketError> {
     // Build the packet
-    TcpPacket::new(
+    timer.start(TimerScope::Tcp);
+    let output = TcpPacket::new(
         SocketAddr::new(IpAddr::V4(new_source_addr), input.source().port()),
         SocketAddr::new(IpAddr::V4(new_destination_addr), input.destination().port()),
         input.sequence,
@@ -42,7 +48,9 @@ pub fn translate_tcp6_to_tcp4(
         input.urgent_pointer,
         input.options,
         input.payload,
-    )
+    );
+    timer.end(TimerScope::Tcp);
+    output
 }
 
 #[cfg(test)]
@@ -68,6 +76,7 @@ mod tests {
             input,
             "2001:db8::1".parse().unwrap(),
             "2001:db8::2".parse().unwrap(),
+            &mut PacketTimer::new(4),
         )
         .unwrap();
 
@@ -104,6 +113,7 @@ mod tests {
             input,
             "192.0.2.1".parse().unwrap(),
             "192.0.2.2".parse().unwrap(),
+            &mut PacketTimer::new(6),
         )
         .unwrap();
 

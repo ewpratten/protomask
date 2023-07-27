@@ -40,9 +40,12 @@ pub fn enable_logger(verbose: bool) {
             ))
         })
         // Set the correct log level based on CLI flags
-        .level(match verbose {
-            true => log::LevelFilter::Debug,
-            false => log::LevelFilter::Info,
+        .level(match std::env::var("PROTOMASK_TRACE") {
+            Ok(_) => log::LevelFilter::Trace,
+            Err(_) => match verbose {
+                true => log::LevelFilter::Debug,
+                false => log::LevelFilter::Info,
+            },
         })
         // Output to STDOUT
         .chain(std::io::stdout())

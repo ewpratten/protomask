@@ -9,7 +9,7 @@ use crate::{
     packet::{
         error::PacketError,
         protocols::{icmp::IcmpPacket, icmpv6::Icmpv6Packet, raw::RawBytes},
-    },
+    }, profiling::{PacketTimer, TimerScope},
 };
 
 use super::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
@@ -21,6 +21,7 @@ pub fn translate_icmp_to_icmpv6(
     input: IcmpPacket<RawBytes>,
     new_source: Ipv6Addr,
     new_destination: Ipv6Addr,
+    timer: &mut PacketTimer
 ) -> Result<Icmpv6Packet<RawBytes>, PacketError> {
     ICMP_COUNTER
         .with_label_values(&[
@@ -29,6 +30,7 @@ pub fn translate_icmp_to_icmpv6(
             &input.icmp_code.0.to_string(),
         ])
         .inc();
+    timer.start(TimerScope::IcmpToIcmpv6);
 
     // Translate the type and code
     let (icmpv6_type, icmpv6_code) =
@@ -43,7 +45,7 @@ pub fn translate_icmp_to_icmpv6(
 
             // Translate
             let inner_payload =
-                translate_ipv4_to_ipv6(inner_payload.try_into()?, new_source, new_destination)?;
+                translate_ipv4_to_ipv6(inner_payload.try_into()?, new_source, new_destination, timer)?;
             let inner_payload: Vec<u8> = inner_payload.into();
 
             // Build the new payload
@@ -58,6 +60,7 @@ pub fn translate_icmp_to_icmpv6(
     };
 
     // Build output packet
+    timer.end(TimerScope::IcmpToIcmpv6);
     Ok(Icmpv6Packet::new(
         new_source,
         new_destination,
@@ -72,6 +75,7 @@ pub fn translate_icmpv6_to_icmp(
     input: Icmpv6Packet<RawBytes>,
     new_source: Ipv4Addr,
     new_destination: Ipv4Addr,
+    timer: &mut PacketTimer
 ) -> Result<IcmpPacket<RawBytes>, PacketError> {
     ICMP_COUNTER
         .with_label_values(&[
@@ -80,6 +84,7 @@ pub fn translate_icmpv6_to_icmp(
             &input.icmp_code.0.to_string(),
         ])
         .inc();
+    timer.start(TimerScope::Icmpv6ToIcmp);
 
     // Translate the type and code
     let (icmp_type, icmp_code) =
@@ -94,7 +99,7 @@ pub fn translate_icmpv6_to_icmp(
 
             // Translate
             let inner_payload =
-                translate_ipv6_to_ipv4(&inner_payload.try_into()?, new_source, new_destination)?;
+                translate_ipv6_to_ipv4(&inner_payload.try_into()?, new_source, new_destination, timer)?;
             let inner_payload: Vec<u8> = inner_payload.into();
 
             // Build the new payload
@@ -109,5 +114,6 @@ pub fn translate_icmpv6_to_icmp(
     };
 
     // Build output packet
+    timer.end(TimerScope::Icmpv6ToIcmp);
     Ok(IcmpPacket::new(icmp_type, icmp_code, payload))
 }

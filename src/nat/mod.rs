@@ -3,7 +3,7 @@ use crate::{
     packet::{
         protocols::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
         xlat::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4},
-    },
+    }, profiling::PacketTimer,
 };
 
 use self::{
@@ -66,6 +66,9 @@ impl Nat64 {
         // Get an rx/tx pair for the interface
         let (tx, mut rx) = self.interface.spawn_worker().await;
 
+        // Only test if we should be printing profiling data once. This won't change mid-execution
+        let should_print_profiling = std::env::var("PROTOMASK_TRACE").is_ok();
+
         // Process packets in a loop
         loop {
             // Try to read a packet
@@ -74,9 +77,15 @@ impl Nat64 {
                     // Clone the TX so the worker can respond with data
                     let tx = tx.clone();
 
+                    // Build a profiling object.
+                    // This will be used by various functions to keep rough track of
+                    // how long each major operation takes in the lifecycle of this Packet
+                    let mut timer = PacketTimer::new(packet[0] >> 4);
+
                     // Separate logic is needed for handling IPv4 vs IPv6 packets, so a check must be done here
                     match packet[0] >> 4 {
                         4 => {
+
                             // Parse the packet
                             let packet: Ipv4Packet<Vec<u8>> = packet.try_into()?;
 
@@ -103,13 +112,18 @@ impl Nat64 {
                                     packet,
                                     new_source,
                                     new_destination,
+                                    &mut timer,
                                 )) {
                                     tx.send(output.into()).await.unwrap();
+                                    if should_print_profiling {
+                                        timer.log();
+                                    }
                                     PACKET_COUNTER.with_label_values(&["ipv6", "sent"]).inc();
                                 }
                             });
                         }
                         6 => {
+
                             // Parse the packet
                             let packet: Ipv6Packet<Vec<u8>> = packet.try_into()?;
 
@@ -152,8 +166,12 @@ impl Nat64 {
                                     &packet,
                                     new_source,
                                     new_destination,
+                                    &mut timer,
                                 )) {
                                     tx.send(output.into()).await.unwrap();
+                                    if should_print_profiling {
+                                        timer.log();
+                                    }
                                     PACKET_COUNTER.with_label_values(&["ipv4", "sent"]).inc();
                                 }
                             });

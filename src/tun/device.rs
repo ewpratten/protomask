@@ -12,7 +12,7 @@ use tokio::{
 };
 use tun_tap::Mode;
 
-use crate::Result;
+use super::TunError;
 
 #[derive(Debug)]
 pub struct TunDevice {
@@ -29,7 +29,7 @@ impl TunDevice {
     ///
     /// The name field can be any string. If `%d` is present in the string,
     /// it will be replaced with a unique number.
-    pub async fn new(name: &str) -> Result<Self> {
+    pub async fn new(name: &str) -> Result<Self, TunError> {
         // Bring up an rtnetlink connection
         let (rt_connection, rt_handle, _) = rtnetlink::new_connection().map_err(|err| {
             log::error!("Failed to open rtnetlink connection");
@@ -85,7 +85,11 @@ impl TunDevice {
     }
 
     /// Add an IP address to this device
-    pub async fn add_address(&mut self, ip_address: IpAddr, prefix_len: u8) -> Result<()> {
+    pub async fn add_address(
+        &mut self,
+        ip_address: IpAddr,
+        prefix_len: u8,
+    ) -> Result<(), TunError> {
         self.rt_handle
             .address()
             .add(self.link_index, ip_address, prefix_len)
@@ -101,7 +105,11 @@ impl TunDevice {
     }
 
     /// Remove an IP address from this device
-    pub async fn remove_address(&mut self, ip_address: IpAddr, prefix_len: u8) -> Result<()> {
+    pub async fn remove_address(
+        &mut self,
+        ip_address: IpAddr,
+        prefix_len: u8,
+    ) -> Result<(), TunError> {
         // Find the address message that matches the given address
         if let Some(address_message) = self
             .rt_handle
@@ -136,7 +144,7 @@ impl TunDevice {
     }
 
     /// Add a route to this device
-    pub async fn add_route(&mut self, destination: IpNet) -> Result<()> {
+    pub async fn add_route(&mut self, destination: IpNet) -> Result<(), TunError> {
         match destination {
             IpNet::V4(destination) => {
                 self.rt_handle

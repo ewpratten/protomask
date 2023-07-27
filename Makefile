@@ -1,11 +1,14 @@
 # All sources used to build the protomask binary
-SRC = Cargo.toml $(shell find src/ -type f -name '*.rs') $(shell find protomask-tun/src/ -type f -name '*.rs')
+SRC = Cargo.toml $(shell find src/ -type f -name '*.rs')
 
 # Used to auto-version things
 CRATE_VERSION = $(shell sed -n -r "s/^version = \"([0-9\.]+)\"/\1/p" Cargo.toml)
 
 target/x86_64-unknown-linux-musl/release/protomask: $(SRC)
 	cross build --target x86_64-unknown-linux-musl --release
+
+target/x86_64-unknown-linux-musl/debug/protomask: $(SRC)
+	cross build --target x86_64-unknown-linux-musl --features profiling
 
 target/aarch64-unknown-linux-musl/release/protomask: $(SRC)
 	cross build --target aarch64-unknown-linux-musl --release

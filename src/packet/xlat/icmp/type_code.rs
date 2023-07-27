@@ -11,6 +11,7 @@ use crate::packet::error::PacketError;
 
 /// Best effort translation from an ICMP type and code to an ICMPv6 type and code
 #[allow(clippy::deprecated_cfg_attr)]
+#[profiling::function]
 pub fn translate_type_and_code_4_to_6(
     icmp_type: IcmpType,
     icmp_code: IcmpCode,
@@ -60,6 +61,7 @@ pub fn translate_type_and_code_4_to_6(
 
 /// Best effort translation from an ICMPv6 type and code to an ICMP type and code
 #[allow(clippy::deprecated_cfg_attr)]
+#[profiling::function]
 pub fn translate_type_and_code_6_to_4(
     icmp_type: Icmpv6Type,
     icmp_code: Icmpv6Code,

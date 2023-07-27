@@ -17,6 +17,7 @@ use super::{
 };
 
 /// Translates an IPv4 packet to an IPv6 packet
+#[tracing::instrument(name="xlat_ipv4_ipv6")]
 pub fn translate_ipv4_to_ipv6(
     input: Ipv4Packet<Vec<u8>>,
     new_source: Ipv6Addr,
@@ -69,6 +70,7 @@ pub fn translate_ipv4_to_ipv6(
 }
 
 /// Translates an IPv6 packet to an IPv4 packet
+#[tracing::instrument(name="xlat_ipv6_ipv4")]
 pub fn translate_ipv6_to_ipv4(
     input: &Ipv6Packet<Vec<u8>>,
     new_source: Ipv4Addr,

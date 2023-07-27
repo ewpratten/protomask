@@ -3,7 +3,7 @@ pub enum Nat64Error {
     #[error(transparent)]
     Table(#[from] super::table::TableError),
     #[error(transparent)]
-    Tun(#[from] protomask_tun::Error),
+    Tun(#[from] crate::tun::TunError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]

@@ -53,6 +53,7 @@ impl Nat64Table {
     }
 
     /// Make a reservation for an IP address pair for eternity
+    #[profiling::function]
     pub fn add_infinite_reservation(
         &mut self,
         ipv6: Ipv6Addr,
@@ -75,6 +76,7 @@ impl Nat64Table {
     }
 
     /// Check if a given address exists in the table
+    #[profiling::function]
     pub fn contains(&self, address: &IpAddr) -> bool {
         match address {
             IpAddr::V4(ipv4) => self.reservations.contains_right(ipv4),
@@ -83,6 +85,7 @@ impl Nat64Table {
     }
 
     /// Get or assign an IPv4 address for the given IPv6 address
+    #[profiling::function]
     pub fn get_or_assign_ipv4(&mut self, ipv6: Ipv6Addr) -> Result<Ipv4Addr, TableError> {
         // Prune old reservations
         self.prune();
@@ -118,6 +121,7 @@ impl Nat64Table {
     }
 
     /// Try to find an IPv6 address for the given IPv4 address
+    #[profiling::function]
     pub fn get_reverse(&mut self, ipv4: Ipv4Addr) -> Result<Ipv6Addr, TableError> {
         // Prune old reservations
         self.prune();
@@ -140,6 +144,7 @@ impl Nat64Table {
 
 impl Nat64Table {
     /// Prune old reservations
+    #[profiling::function]
     fn prune(&mut self) {
         let now = Instant::now();
 
@@ -162,6 +167,7 @@ impl Nat64Table {
         });
     }
 
+    #[profiling::function]
     fn track_utilization(&self) {
         // Count static and dynamic in a single pass
         let (total_dynamic_reservations, total_static_reservations) = self

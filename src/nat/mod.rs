@@ -12,7 +12,7 @@ use self::{
     utils::{embed_address, extract_address, unwrap_log},
 };
 use ipnet::{Ipv4Net, Ipv6Net};
-use protomask_tun::TunDevice;
+use crate::tun::TunDevice;
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     time::Duration,
@@ -68,6 +68,8 @@ impl Nat64 {
 
         // Process packets in a loop
         loop {
+            profiling::finish_frame!();
+            
             // Try to read a packet
             match rx.recv().await {
                 Ok(packet) => {
@@ -98,7 +100,7 @@ impl Nat64 {
                                 .inc();
 
                             // Spawn a task to process the packet
-                            tokio::spawn(async move {
+                            // tokio::spawn(async move {
                                 if let Some(output) = unwrap_log(translate_ipv4_to_ipv6(
                                     packet,
                                     new_source,
@@ -107,7 +109,7 @@ impl Nat64 {
                                     tx.send(output.into()).await.unwrap();
                                     PACKET_COUNTER.with_label_values(&["ipv6", "sent"]).inc();
                                 }
-                            });
+                            // });
                         }
                         6 => {
                             // Parse the packet
@@ -147,7 +149,7 @@ impl Nat64 {
                                 .inc();
 
                             // Spawn a task to process the packet
-                            tokio::spawn(async move {
+                            // tokio::spawn(async move {
                                 if let Some(output) = unwrap_log(translate_ipv6_to_ipv4(
                                     &packet,
                                     new_source,
@@ -156,7 +158,7 @@ impl Nat64 {
                                     tx.send(output.into()).await.unwrap();
                                     PACKET_COUNTER.with_label_values(&["ipv4", "sent"]).inc();
                                 }
-                            });
+                            // });
                         }
                         n => {
                             log::warn!("Unknown IP version: {}", n);

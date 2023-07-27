@@ -17,6 +17,7 @@ use super::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 mod type_code;
 
 /// Translates an ICMP packet to an ICMPv6 packet
+#[profiling::function]
 pub fn translate_icmp_to_icmpv6(
     input: IcmpPacket<RawBytes>,
     new_source: Ipv6Addr,
@@ -68,6 +69,7 @@ pub fn translate_icmp_to_icmpv6(
 }
 
 /// Translates an ICMPv6 packet to an ICMP packet
+#[profiling::function]
 pub fn translate_icmpv6_to_icmp(
     input: Icmpv6Packet<RawBytes>,
     new_source: Ipv4Addr,

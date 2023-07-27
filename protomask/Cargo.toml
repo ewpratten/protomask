@@ -17,3 +17,4 @@ tokio = { version = "1.29.1", features = ["macros", "rt-multi-thread", "sync"] }
 clap = { version = "4.3.11", features = ["derive"] }
 aya = { git = "https://github.com/aya-rs/aya", rev = "f334cbd86ee8c83b29940ee80f0ab80a6d58e5d1", features = ["async_tokio"] }
 aya-log = { git = "https://github.com/aya-rs/aya", rev = "f334cbd86ee8c83b29940ee80f0ab80a6d58e5d1" }
+cfg-if = "1.0.0"

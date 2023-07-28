@@ -1,3 +1,5 @@
+//! Definitions for each type of packet `protomask` can handle
+
 pub mod icmp;
 pub mod icmpv6;
 pub mod ipv4;

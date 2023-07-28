@@ -85,7 +85,7 @@ impl PacketTimer {
 
     pub fn log(&self) {
         log::trace!(
-            "[Timer report] proto: {}, total: {:05}µs, ipv4_to_ipv6: {:05}µs, ipv6_to_ipv4: {:05}µs, icmp_to_icmpv6: {:05}µs, icmpv6_to_icmp: {:05}µs, udp: {:05}µs, tcp: {:05}µs",
+            "[Timer report] proto: {}, total: {:05}µs, ipv4_to_ipv6: {:05}µs, ipv6_to_ipv4: {:05}µs, icmp_to_icmpv6: {:05}µs, icmpv6_to_icmp: {:05}µs, udp: {:05}ns, tcp: {:05}ns",
             self.protocol,
             self.creation_time.elapsed().as_micros(),
             self.states.get(&TimerScope::Ipv4ToIpv6).map(|val| match val {
@@ -105,11 +105,11 @@ impl PacketTimer {
                 _=>0
             }).unwrap_or(0),
             self.states.get(&TimerScope::Udp).map(|val| match val {
-                TimerState::Ended(duration, _) => duration.as_micros(),
+                TimerState::Ended(duration, _) => duration.as_nanos(),
                 _=>0
             }).unwrap_or(0),
             self.states.get(&TimerScope::Tcp).map(|val| match val {
-                TimerState::Ended(duration, _) => duration.as_micros(),
+                TimerState::Ended(duration, _) => duration.as_nanos(),
                 _=>0
             }).unwrap_or(0),
         );

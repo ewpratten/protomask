@@ -3,11 +3,10 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use pnet_packet::ip::IpNextHeaderProtocols;
 
 use crate::{
-    packet::protocols::{icmp::IcmpPacket, tcp::TcpPacket, udp::UdpPacket},
-    packet::{
+    net::packet::{
         error::PacketError,
-        protocols::{icmpv6::Icmpv6Packet, ipv4::Ipv4Packet, ipv6::Ipv6Packet, raw::RawBytes},
-    }, profiling::{PacketTimer, TimerScope},
+        protocols::{icmpv6::Icmpv6Packet, ipv4::Ipv4Packet, ipv6::Ipv6Packet, raw::RawBytes, icmp::IcmpPacket, udp::UdpPacket, tcp::TcpPacket},
+    }, utils::profiling::{TimerScope, PacketTimer}, 
 };
 
 use super::{

@@ -1,0 +1,16 @@
+[package]
+name = "addrmap"
+version = "0.1.0"
+authors = ["Evan Pratten <ewpratten@gmail.com>"]
+edition = "2021"
+description = "Utilities for high-speed IP address mapping"
+readme = "README.md"
+homepage = "https://github.com/ewpratten/protomask"
+documentation = "https://docs.rs/protomask"
+repository = "https://github.com/ewpratten/protomask"
+license = "GPL-3.0"
+keywords = []
+categories = []
+
+[dependencies]
+rustc-hash = "1.1.0"

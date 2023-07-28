@@ -7,7 +7,7 @@ use pnet_packet::{
     icmpv6::{Icmpv6Code, Icmpv6Type, Icmpv6Types},
 };
 
-use crate::packet::error::PacketError;
+use crate::net::packet::error::PacketError;
 
 /// Best effort translation from an ICMP type and code to an ICMPv6 type and code
 #[allow(clippy::deprecated_cfg_attr)]

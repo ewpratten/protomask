@@ -5,7 +5,7 @@ use pnet_packet::{
     Packet,
 };
 
-use crate::packet::error::PacketError;
+use crate::net::packet::error::PacketError;
 
 use super::raw::RawBytes;
 

@@ -7,7 +7,7 @@ pub enum Nat64Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
-    PacketHandling(#[from] crate::packet::error::PacketError),
+    PacketHandling(#[from] crate::net::packet::error::PacketError),
     #[error(transparent)]
     PacketReceive(#[from] tokio::sync::broadcast::error::RecvError),
     #[error(transparent)]

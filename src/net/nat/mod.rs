@@ -1,10 +1,5 @@
-use crate::{
-    metrics::PACKET_COUNTER,
-    packet::{
-        protocols::{ipv4::Ipv4Packet, ipv6::Ipv6Packet},
-        xlat::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4},
-    }, profiling::PacketTimer,
-};
+
+use crate::utils::{profiling::PacketTimer, metrics::PACKET_COUNTER};
 
 use self::{
     error::Nat64Error,
@@ -18,6 +13,8 @@ use std::{
     time::Duration,
 };
 use tokio::sync::broadcast;
+
+use super::packet::{protocols::{ipv4::Ipv4Packet, ipv6::Ipv6Packet}, xlat::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4}};
 
 mod error;
 mod table;
@@ -85,7 +82,6 @@ impl Nat64 {
                     // Separate logic is needed for handling IPv4 vs IPv6 packets, so a check must be done here
                     match packet[0] >> 4 {
                         4 => {
-
                             // Parse the packet
                             let packet: Ipv4Packet<Vec<u8>> = packet.try_into()?;
 
@@ -107,23 +103,20 @@ impl Nat64 {
                                 .inc();
 
                             // Spawn a task to process the packet
-                            tokio::spawn(async move {
-                                if let Some(output) = unwrap_log(translate_ipv4_to_ipv6(
-                                    packet,
-                                    new_source,
-                                    new_destination,
-                                    &mut timer,
-                                )) {
-                                    tx.send(output.into()).await.unwrap();
-                                    if should_print_profiling {
-                                        timer.log();
-                                    }
-                                    PACKET_COUNTER.with_label_values(&["ipv6", "sent"]).inc();
+                            if let Some(output) = unwrap_log(translate_ipv4_to_ipv6(
+                                packet,
+                                new_source,
+                                new_destination,
+                                &mut timer,
+                            )) {
+                                tx.send(output.into()).await.unwrap();
+                                if should_print_profiling {
+                                    timer.log();
                                 }
-                            });
+                                PACKET_COUNTER.with_label_values(&["ipv6", "sent"]).inc();
+                            }
                         }
                         6 => {
-
                             // Parse the packet
                             let packet: Ipv6Packet<Vec<u8>> = packet.try_into()?;
 
@@ -161,20 +154,18 @@ impl Nat64 {
                                 .inc();
 
                             // Spawn a task to process the packet
-                            tokio::spawn(async move {
-                                if let Some(output) = unwrap_log(translate_ipv6_to_ipv4(
-                                    &packet,
-                                    new_source,
-                                    new_destination,
-                                    &mut timer,
-                                )) {
-                                    tx.send(output.into()).await.unwrap();
-                                    if should_print_profiling {
-                                        timer.log();
-                                    }
-                                    PACKET_COUNTER.with_label_values(&["ipv4", "sent"]).inc();
+                            if let Some(output) = unwrap_log(translate_ipv6_to_ipv4(
+                                &packet,
+                                new_source,
+                                new_destination,
+                                &mut timer,
+                            )) {
+                                tx.send(output.into()).await.unwrap();
+                                if should_print_profiling {
+                                    timer.log();
                                 }
-                            });
+                                PACKET_COUNTER.with_label_values(&["ipv4", "sent"]).inc();
+                            }
                         }
                         n => {
                             log::warn!("Unknown IP version: {}", n);

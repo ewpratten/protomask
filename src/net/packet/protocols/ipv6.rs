@@ -2,7 +2,7 @@ use std::net::Ipv6Addr;
 
 use pnet_packet::{ip::IpNextHeaderProtocol, Packet};
 
-use crate::packet::error::PacketError;
+use crate::net::packet::error::PacketError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ipv6Packet<T> {

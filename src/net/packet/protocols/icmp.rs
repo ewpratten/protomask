@@ -3,7 +3,7 @@ use pnet_packet::{
     Packet,
 };
 
-use crate::packet::error::PacketError;
+use crate::net::packet::error::PacketError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IcmpPacket<T> {

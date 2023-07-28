@@ -1,11 +1,11 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use crate::{
-    packet::{
+    net::packet::{
         error::PacketError,
         protocols::{raw::RawBytes, udp::UdpPacket},
     },
-    profiling::{PacketTimer, TimerScope},
+    utils::profiling::{PacketTimer, TimerScope},
 };
 
 /// Translates an IPv4 UDP packet to an IPv6 UDP packet
@@ -47,7 +47,7 @@ pub fn translate_udp6_to_udp4(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::packet::protocols::udp::UdpPacket;
+    use crate::net::packet::protocols::udp::UdpPacket;
 
     #[test]
     fn test_translate_udp4_to_udp6() {

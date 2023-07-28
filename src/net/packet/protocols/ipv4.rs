@@ -6,7 +6,7 @@ use pnet_packet::{
     Packet,
 };
 
-use crate::packet::error::PacketError;
+use crate::net::packet::error::PacketError;
 
 #[derive(Debug, Clone)]
 pub struct Ipv4Packet<T> {

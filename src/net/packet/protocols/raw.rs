@@ -1,4 +1,4 @@
-use crate::packet::error::PacketError;
+use crate::net::packet::error::PacketError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RawBytes(pub Vec<u8>);

@@ -2,12 +2,15 @@
 
 use clap::Parser;
 use config::Config;
-use logging::enable_logger;
-use protomask::nat::Nat64;
+use net::nat::Nat64;
+use utils::logging::enable_logger;
 
+use crate::utils::metrics::serve_metrics;
+
+mod utils;
+mod net;
 mod cli;
 mod config;
-mod logging;
 
 #[tokio::main]
 pub async fn main() {
@@ -44,7 +47,7 @@ pub async fn main() {
     // Handle metrics requests
     if let Some(bind_addr) = config.prom_bind_addr {
         log::info!("Enabling metrics server on {}", bind_addr);
-        tokio::spawn(protomask::metrics::serve_metrics(bind_addr));
+        tokio::spawn(serve_metrics(bind_addr));
     }
 
     // Handle packets

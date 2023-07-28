@@ -4,13 +4,8 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use pnet_packet::{icmp::IcmpTypes, icmpv6::Icmpv6Types};
 
-use crate::{
-    metrics::ICMP_COUNTER,
-    packet::{
-        error::PacketError,
-        protocols::{icmp::IcmpPacket, icmpv6::Icmpv6Packet, raw::RawBytes},
-    }, profiling::{PacketTimer, TimerScope},
-};
+
+use crate::{utils::{profiling::{TimerScope, PacketTimer}, metrics::ICMP_COUNTER}, net::packet::{protocols::{raw::RawBytes, icmpv6::Icmpv6Packet, icmp::IcmpPacket}, error::PacketError}};
 
 use super::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 

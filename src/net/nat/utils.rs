@@ -2,7 +2,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use ipnet::Ipv6Net;
 
-use crate::packet::error::PacketError;
+use crate::net::packet::error::PacketError;
 
 /// Embed an IPv4 address in an IPv6 prefix
 pub fn embed_address(ipv4_address: Ipv4Addr, ipv6_prefix: Ipv6Net) -> Ipv6Addr {

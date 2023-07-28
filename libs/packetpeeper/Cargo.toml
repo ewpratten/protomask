@@ -1,0 +1,16 @@
+[package]
+name = "packetpeeper"
+version = "0.1.0"
+authors = ["Evan Pratten <ewpratten@gmail.com>"]
+edition = "2021"
+description = "Tooks for acting on a raw byte slice as a packet"
+readme = "README.md"
+homepage = "https://github.com/ewpratten/protomask/libs/packetpeeper"
+documentation = "https://docs.rs/packetpeeper"
+repository = "https://github.com/ewpratten/protomask"
+license = "GPL-3.0"
+keywords = []
+categories = []
+
+[dependencies]
+

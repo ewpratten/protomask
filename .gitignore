@@ -16,7 +16,4 @@ Cargo.lock
 # already existing elements were commented out
 
 /target
-#Cargo.lock
-
-# Built packages
-/tars
+/libs/*/target

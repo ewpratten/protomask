@@ -41,7 +41,7 @@ lazy_static = "1.4.0"
 
 [[bin]]
 name = "protomask"
-path = "src/cli/main.rs"
+path = "src/main.rs"
 
 [package.metadata.deb]
 section = "network"

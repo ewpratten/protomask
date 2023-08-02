@@ -2,16 +2,16 @@ use crate::{error::Error, ALLOWED_PREFIX_LENS};
 use std::cmp::max;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-// /// Extracts an IPv4 address from an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
-// pub fn extract_ipv4_addr(ipv6_addr: Ipv6Addr, prefix_length: u8) -> Result<Ipv4Addr, Error> {
-//     // Fail if the prefix length is invalid
-//     if !ALLOWED_PREFIX_LENS.contains(&prefix_length) {
-//         return Err(Error::InvalidPrefixLength(prefix_length));
-//     }
+/// Extracts an IPv4 address from an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
+pub fn extract_ipv4_addr(ipv6_addr: Ipv6Addr, prefix_length: u8) -> Result<Ipv4Addr, Error> {
+    // Fail if the prefix length is invalid
+    if !ALLOWED_PREFIX_LENS.contains(&prefix_length) {
+        return Err(Error::InvalidPrefixLength(prefix_length));
+    }
 
-//     // Fall through to the unchecked version of this function
-//     Ok(unsafe { extract_ipv4_addr_unchecked(ipv6_addr, prefix_length) })
-// }
+    // Fall through to the unchecked version of this function
+    Ok(unsafe { extract_ipv4_addr_unchecked(ipv6_addr, prefix_length) })
+}
 
 /// Extracts an IPv4 address from an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
 ///
@@ -23,10 +23,9 @@ pub unsafe fn extract_ipv4_addr_unchecked(ipv6_addr: Ipv6Addr, prefix_length: u8
 
     // Extract the IPv4 address from the IPv6 address
     Ipv4Addr::from(
-        // format!("{:02x}",
         (((host_part & 0xffff_ffff_ffff_ffff_0000_0000_0000_0000)
             | (host_part & 0x00ff_ffff_ffff_ffff) << 8)
-            >> max(8, 128 - prefix_length - 32)) as u32, // )
+            >> max(8, 128 - prefix_length - 32)) as u32,
     )
 }
 
@@ -78,7 +77,10 @@ mod tests {
     fn test_extract_len_64() {
         unsafe {
             assert_eq!(
-                extract_ipv4_addr_unchecked("64:ff9b:0000:0000:00c0:0002:0100::".parse().unwrap(), 64),
+                extract_ipv4_addr_unchecked(
+                    "64:ff9b:0000:0000:00c0:0002:0100::".parse().unwrap(),
+                    64
+                ),
                 "192.0.2.1".parse::<Ipv4Addr>().unwrap(),
             )
         }
@@ -88,7 +90,10 @@ mod tests {
     fn test_extract_len_96() {
         unsafe {
             assert_eq!(
-                extract_ipv4_addr_unchecked("64:ff9b:0000:0000:0000:0000:c000:0201".parse().unwrap(), 96),
+                extract_ipv4_addr_unchecked(
+                    "64:ff9b:0000:0000:0000:0000:c000:0201".parse().unwrap(),
+                    96
+                ),
                 "192.0.2.1".parse::<Ipv4Addr>().unwrap(),
             )
         }

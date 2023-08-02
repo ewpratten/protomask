@@ -8,7 +8,8 @@ pub mod error;
 
 mod embed;
 mod extract;
-pub use embed::embed_ipv4_addr;
+pub use embed::{embed_ipv4_addr, embed_ipv4_addr_unchecked};
+pub use extract::{extract_ipv4_addr, extract_ipv4_addr_unchecked};
 
 /// All allowed IPv6 prefix lengths according to [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
 pub const ALLOWED_PREFIX_LENS: [u8; 6] = [32, 40, 48, 56, 64, 96];

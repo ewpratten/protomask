@@ -19,10 +19,10 @@ pub fn embed_ipv4_addr(ipv4_addr: Ipv4Addr, ipv6_prefix: Ipv6Net) -> Result<Ipv6
 /// Embeds an IPv4 address into an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
 ///
 /// **Warning:** This function does not check that the prefix length is valid according to the RFC. Use `embed_ipv4_addr` instead.
-pub unsafe fn embed_ipv4_addr_unchecked(
-    ipv4_addr: Ipv4Addr,
-    ipv6_prefix: Ipv6Net,
-) -> Ipv6Addr {
+#[must_use]
+#[allow(clippy::cast_lossless)]
+#[allow(clippy::cast_possible_truncation)]
+pub unsafe fn embed_ipv4_addr_unchecked(ipv4_addr: Ipv4Addr, ipv6_prefix: Ipv6Net) -> Ipv6Addr {
     // Convert to integer types
     let ipv4_addr = u32::from(ipv4_addr);
     let prefix_len = ipv6_prefix.prefix_len() as i16;
@@ -33,7 +33,7 @@ pub unsafe fn embed_ipv4_addr_unchecked(
     // and shift them into place on each side of the boundary
     Ipv6Addr::from(
         ipv6_prefix
-            | (((ipv4_addr as u128 & (0xffff_ffffu128 << (32 + min(0, prefix_len - 64)))) as u128)
+            | ((ipv4_addr as u128 & (0xffff_ffffu128 << (32 + min(0, prefix_len - 64))))
                 << (128 - prefix_len - 32))
             | (((ipv4_addr as u128) << max(0, 128 - prefix_len - 32 - 8)) & 0x00ff_ffff_ffff_ffff),
     )

@@ -16,6 +16,9 @@ pub fn extract_ipv4_addr(ipv6_addr: Ipv6Addr, prefix_length: u8) -> Result<Ipv4A
 /// Extracts an IPv4 address from an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
 ///
 /// **Warning:** This function does not check that the prefix length is valid according to the RFC. Use `extract_ipv4_addr` instead.
+#[must_use]
+#[allow(clippy::cast_lossless)]
+#[allow(clippy::cast_possible_truncation)]
 pub unsafe fn extract_ipv4_addr_unchecked(ipv6_addr: Ipv6Addr, prefix_length: u8) -> Ipv4Addr {
     // Convert the IPv6 address to a number for easier manipulation
     let ipv6_addr = u128::from(ipv6_addr);

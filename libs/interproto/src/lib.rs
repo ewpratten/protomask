@@ -3,3 +3,6 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
+
+pub mod protocols;
+pub mod error;

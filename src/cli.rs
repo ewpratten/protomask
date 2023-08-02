@@ -22,6 +22,9 @@ pub struct Args {
     #[clap(subcommand)]
     pub command: Commands,
 
+    /// Enable OpenMetrics on a given address
+    pub openmetrics_addr: 
+
     /// Enable verbose logging
     #[clap(short, long)]
     pub verbose: bool,
@@ -47,8 +50,15 @@ pub enum Commands {
         #[clap(long = "via", default_value_t = wkp!(), value_parser = nat64_prefix_parser)]
         origin_prefix: Ipv6Net,
     },
+    /// Run protomask in RFC2529 / 6over4 mode
+    SixOverFour {
+        /// The IPv4 network interface to communicate over
+        #[clap()]
+        interface: String,
+    }
 }
 
+/// Parses an IPv6 prefix and ensures it is at most a /96
 fn nat64_prefix_parser(s: &str) -> Result<Ipv6Net, String> {
     let net = Ipv6Net::from_str(s).map_err(|err| err.to_string())?;
     if net.prefix_len() > 96 {

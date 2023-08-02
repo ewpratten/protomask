@@ -15,11 +15,9 @@ pub struct CrossProtocolNetworkAddressTable {
 
 impl CrossProtocolNetworkAddressTable {
     /// Construct a new empty `CrossProtocolNetworkAddressTable`
+    #[must_use]
     pub fn new() -> Self {
-        Self {
-            addr_map: BiHashMap::new(),
-            timeouts: FxHashMap::default(),
-        }
+        Self::default()
     }
 
     /// Prune all old mappings
@@ -88,5 +86,14 @@ impl CrossProtocolNetworkAddressTable {
     #[must_use]
     pub fn get_ipv4<T: Into<u128>>(&self, ipv6: T) -> Option<u32> {
         self.addr_map.get_left(&ipv6.into()).copied()
+    }
+}
+
+impl Default for CrossProtocolNetworkAddressTable {
+    fn default() -> Self {
+        Self {
+            addr_map: BiHashMap::new(),
+            timeouts: FxHashMap::default(),
+        }
     }
 }

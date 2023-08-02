@@ -15,11 +15,9 @@ pub struct NetworkAddressTable {
 
 impl NetworkAddressTable {
     /// Construct a new empty `NetworkAddressTable`
+    #[must_use]
     pub fn new() -> Self {
-        Self {
-            addr_map: BiHashMap::new(),
-            timeouts: FxHashMap::default(),
-        }
+        Self::default()
     }
 
     /// Prune all old mappings
@@ -83,5 +81,14 @@ impl NetworkAddressTable {
     #[must_use]
     pub fn get_left<T: Into<u32>>(&self, right: T) -> Option<u32> {
         self.addr_map.get_left(&right.into()).copied()
+    }
+}
+
+impl Default for NetworkAddressTable {
+    fn default() -> Self {
+        Self {
+            addr_map: BiHashMap::new(),
+            timeouts: FxHashMap::default(),
+        }
     }
 }

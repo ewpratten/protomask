@@ -56,4 +56,4 @@
 # systemd-units = { enable = false }
 
 [workspace]
-members = ["libs/easy-tun", "libs/fast-nat"]
+members = ["libs/easy-tun", "libs/fast-nat", "libs/interproto"]

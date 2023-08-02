@@ -41,7 +41,7 @@ exclude = ["/.github/", "/.vscode/"]
 # lazy_static = "1.4.0"
 
 [workspace]
-members = ["libs/easy-tun", "libs/fast-nat", "libs/interproto"]
+members = ["libs/easy-tun", "libs/fast-nat", "libs/interproto", "libs/rfc6052"]
 
 [[bin]]
 name = "protomask"
@@ -60,6 +60,7 @@ path = "src/protomask-6over4.rs"
 easy-tun = { path = "libs/easy-tun" }
 fast-nat = { path = "libs/fast-nat" }
 interproto = { path = "libs/interproto" }
+rfc6052 = { path = "libs/rfc6052" }
 
 # External Dependencies
 tokio = { version = "1.29.1", features = ["macros", "rt-multi-thread"] }

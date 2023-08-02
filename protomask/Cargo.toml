@@ -1,0 +1,56 @@
+[package]
+name = "protomask"
+version = "0.2.0"
+authors = ["Evan Pratten <ewpratten@gmail.com>"]
+edition = "2021"
+description = "A user space NAT64 implementation"
+readme = "README.md"
+homepage = "https://github.com/ewpratten/protomask"
+documentation = "https://docs.rs/protomask"
+repository = "https://github.com/ewpratten/protomask"
+license = "GPL-3.0"
+keywords = []
+categories = []
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dependencies]
+protomask-tun = { path = "protomask-tun", version = "0.1.0" }
+tokio = { version = "1.29.1", features = [
+    "macros",
+    "rt-multi-thread",
+    # "process",
+    "sync"
+] }
+clap = { version = "4.3.11", features = ["derive"] }
+serde = { version = "1.0.171", features = ["derive"] }
+ipnet = { version = "2.8.0", features = ["serde"] }
+hyper = { version = "0.14.27", features = ["server", "http1", "tcp"] }
+owo-colors = { version = "3.5.0", features = ["supports-colors"] }
+toml = "0.7.6"
+log = "0.4.19"
+fern = "0.6.2"
+serde_path_to_error = "0.1.13"
+thiserror = "1.0.43"
+tun-tap = "0.1.3"
+bimap = "0.6.3"
+pnet_packet = "0.34.0"
+rtnetlink = "0.13.0"
+futures = "0.3.28"
+prometheus = "0.13.3"
+lazy_static = "1.4.0"
+
+[[bin]]
+name = "protomask"
+path = "src/cli/main.rs"
+
+[package.metadata.deb]
+section = "network"
+assets = [
+    ["target/release/protomask", "/usr/local/bin/protomask", "755"],
+    ["./protomask.toml", "/etc/protomask.toml", "644"],
+    ["README.md", "usr/share/doc/protomask/README.md", "644"]
+]
+conf-files = ["/etc/protomask.toml"]
+depends = []
+maintainer-scripts = "./debian/"
+systemd-units = { enable = false }

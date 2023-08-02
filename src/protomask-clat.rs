@@ -9,9 +9,10 @@ use easy_tun::Tun;
 use interproto::protocols::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 use ipnet::Ipv6Net;
 use nix::unistd::Uid;
+use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
 use std::{
     io::{Read, Write},
-    net::Ipv4Addr,
+    net::{Ipv4Addr, Ipv6Addr},
 };
 
 mod common;
@@ -61,28 +62,37 @@ pub async fn main() {
         log::trace!("New packet with layer 3 protocol: {}", layer_3_proto);
         let output = match layer_3_proto {
             // IPv4
-            4 => {
-                // Get the IPv4 source and destination addresses
-                let ipv4_source =
-                    u32::from_be_bytes([buffer[12], buffer[13], buffer[14], buffer[15]]);
-                let ipv4_destination =
-                    u32::from_be_bytes([buffer[16], buffer[17], buffer[18], buffer[19]]);
-
-                // Create a new IPv6 source and destination address by embedding the IPv4 addresses into the clat prefix
-                let new_source = u128::from(args.embed_prefix.addr()) | (ipv4_source as u128);
-                let new_destination =
-                    u128::from(args.embed_prefix.addr()) | (ipv4_destination as u128);
-
-                translate_ipv4_to_ipv6(&buffer[..len], new_source.into(), new_destination.into())
-            }
+            4 => translate_ipv4_to_ipv6(
+                &buffer[..len],
+                unsafe {
+                    embed_ipv4_addr_unchecked(
+                        Ipv4Addr::from(u32::from_be_bytes(buffer[12..16].try_into().unwrap())),
+                        args.embed_prefix,
+                    )
+                },
+                unsafe {
+                    embed_ipv4_addr_unchecked(
+                        Ipv4Addr::from(u32::from_be_bytes(buffer[16..20].try_into().unwrap())),
+                        args.embed_prefix,
+                    )
+                },
+            ),
 
             // IPv6
             6 => translate_ipv6_to_ipv4(
                 &buffer[..len],
-                // NOTE: The new source and destination addresses are just the last
-                // 4 octets of the IPv6 source and destination addresses
-                Ipv4Addr::new(buffer[20], buffer[21], buffer[22], buffer[23]),
-                Ipv4Addr::new(buffer[36], buffer[37], buffer[38], buffer[39]),
+                unsafe {
+                    extract_ipv4_addr_unchecked(
+                        Ipv6Addr::from(u128::from_be_bytes(buffer[8..24].try_into().unwrap())),
+                        args.embed_prefix.prefix_len(),
+                    )
+                },
+                unsafe {
+                    extract_ipv4_addr_unchecked(
+                        Ipv6Addr::from(u128::from_be_bytes(buffer[24..40].try_into().unwrap())),
+                        args.embed_prefix.prefix_len(),
+                    )
+                },
             ),
             // Unknown
             proto => {
@@ -91,5 +101,8 @@ pub async fn main() {
             }
         }
         .unwrap();
+
+        // Write the translated packet back to the TUN interface
+        tun.write(&output).unwrap();
     }
 }

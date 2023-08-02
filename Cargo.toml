@@ -1,16 +1,17 @@
-# [package]
-# name = "protomask"
-# version = "0.2.0"
-# authors = ["Evan Pratten <ewpratten@gmail.com>"]
-# edition = "2021"
-# description = "A user space NAT64 implementation"
-# readme = "README.md"
-# homepage = "https://github.com/ewpratten/protomask"
-# documentation = "https://docs.rs/protomask"
-# repository = "https://github.com/ewpratten/protomask"
-# license = "GPL-3.0"
-# keywords = []
-# categories = []
+[package]
+name = "protomask"
+version = "0.2.0"
+authors = ["Evan Pratten <ewpratten@gmail.com>"]
+edition = "2021"
+description = "A user space NAT64 implementation"
+readme = "README.md"
+homepage = "https://github.com/ewpratten/protomask"
+documentation = "https://docs.rs/protomask"
+repository = "https://github.com/ewpratten/protomask"
+license = "GPL-3.0"
+keywords = []
+categories = []
+exclude = ["/.github/", "/.vscode/"]
 
 # # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 # [dependencies]
@@ -39,21 +40,56 @@
 # prometheus = "0.13.3"
 # lazy_static = "1.4.0"
 
-# [[bin]]
-# name = "protomask"
-# path = "src/cli/main.rs"
-
-# [package.metadata.deb]
-# section = "network"
-# assets = [
-#     ["target/release/protomask", "/usr/local/bin/protomask", "755"],
-#     ["./protomask.toml", "/etc/protomask.toml", "644"],
-#     ["README.md", "usr/share/doc/protomask/README.md", "644"]
-# ]
-# conf-files = ["/etc/protomask.toml"]
-# depends = []
-# maintainer-scripts = "./debian/"
-# systemd-units = { enable = false }
-
 [workspace]
 members = ["libs/easy-tun", "libs/fast-nat", "libs/interproto"]
+
+[[bin]]
+name = "protomask"
+path = "src/protomask.rs"
+
+[[bin]]
+name = "protomask-clat"
+path = "src/protomask-clat.rs"
+
+[[bin]]
+name = "protomask-6over4"
+path = "src/protomask-6over4.rs"
+
+[dependencies]
+# Internal dependencies
+easy-tun = { path = "libs/easy-tun" }
+fast-nat = { path = "libs/fast-nat" }
+interproto = { path = "libs/interproto" }
+
+# External Dependencies
+tokio = { version = "1.29.1", features = ["macros", "rt-multi-thread"] }
+owo-colors = { version = "3.5.0", features = ["supports-colors"] }
+clap = { version = "4.3.11", features = ["derive"] }
+log = "0.4.19"
+fern = "0.6.2"
+ipnet = "2.8.0"
+nix = "0.26.2"
+
+[package.metadata.deb]
+section = "network"
+assets = [
+    [
+        "target/release/protomask",
+        "/usr/local/bin/protomask",
+        "755",
+    ],
+    [
+        "./protomask.toml",
+        "/etc/protomask.toml",
+        "644",
+    ],
+    [
+        "README.md",
+        "usr/share/doc/protomask/README.md",
+        "644",
+    ],
+]
+conf-files = ["/etc/protomask.toml"]
+depends = []
+maintainer-scripts = "./debian/"
+systemd-units = { enable = false }

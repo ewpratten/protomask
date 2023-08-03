@@ -9,8 +9,8 @@ homepage = "https://github.com/ewpratten/protomask/tree/master/libs/rfc6052"
 documentation = "https://docs.rs/rfc6052"
 repository = "https://github.com/ewpratten/protomask"
 license = "GPL-3.0"
-keywords = []
-categories = []
+keywords = ["rfc6052", "ipv4-embedded-ipv6", "address-translation", "ipv4", "ipv6"]
+categories = ["algorithms", "encoding", "network-programming"]
 
 [dependencies]
 thiserror = "^1.0.44"

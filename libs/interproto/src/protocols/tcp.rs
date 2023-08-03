@@ -10,26 +10,41 @@ pub fn recalculate_tcp_checksum_ipv6(
     new_source: Ipv6Addr,
     new_destination: Ipv6Addr,
 ) -> Result<Vec<u8>> {
-    // Clone the packet so we can modify it
-    let mut tcp_packet_buffer = tcp_packet.to_vec();
+    // This scope is used to collect packet drop metrics
+    {
+        // Clone the packet so we can modify it
+        let mut tcp_packet_buffer = tcp_packet.to_vec();
 
-    // Get safe mutable access to the packet
-    let mut tcp_packet =
-        MutableTcpPacket::new(&mut tcp_packet_buffer).ok_or(Error::PacketTooShort {
-            expected: TcpPacket::minimum_packet_size(),
-            actual: tcp_packet.len(),
-        })?;
+        // Get safe mutable access to the packet
+        let mut tcp_packet =
+            MutableTcpPacket::new(&mut tcp_packet_buffer).ok_or(Error::PacketTooShort {
+                expected: TcpPacket::minimum_packet_size(),
+                actual: tcp_packet.len(),
+            })?;
 
-    // Edit the packet's checksum
-    tcp_packet.set_checksum(0);
-    tcp_packet.set_checksum(tcp::ipv6_checksum(
-        &tcp_packet.to_immutable(),
-        &new_source,
-        &new_destination,
-    ));
+        // Edit the packet's checksum
+        tcp_packet.set_checksum(0);
+        tcp_packet.set_checksum(tcp::ipv6_checksum(
+            &tcp_packet.to_immutable(),
+            &new_source,
+            &new_destination,
+        ));
 
-    // Return the translated packet
-    Ok(tcp_packet_buffer)
+        // Track the translated packet
+        #[cfg(feature = "metrics")]
+        protomask_metrics::metric!(PACKET_COUNTER, PROTOCOL_TCP, STATUS_TRANSLATED).inc();
+
+        // Return the translated packet
+        Ok(tcp_packet_buffer)
+    }
+    .map_err(|error| {
+        // Track the dropped packet
+        #[cfg(feature = "metrics")]
+        protomask_metrics::metric!(PACKET_COUNTER, PROTOCOL_TCP, STATUS_DROPPED).inc();
+
+        // Pass the error through
+        error
+    })
 }
 
 /// Re-calculates a TCP packet's checksum with a new IPv4 pseudo-header.
@@ -38,26 +53,41 @@ pub fn recalculate_tcp_checksum_ipv4(
     new_source: Ipv4Addr,
     new_destination: Ipv4Addr,
 ) -> Result<Vec<u8>> {
-    // Clone the packet so we can modify it
-    let mut tcp_packet_buffer = tcp_packet.to_vec();
+    // This scope is used to collect packet drop metrics
+    {
+        // Clone the packet so we can modify it
+        let mut tcp_packet_buffer = tcp_packet.to_vec();
 
-    // Get safe mutable access to the packet
-    let mut tcp_packet =
-        MutableTcpPacket::new(&mut tcp_packet_buffer).ok_or(Error::PacketTooShort {
-            expected: TcpPacket::minimum_packet_size(),
-            actual: tcp_packet.len(),
-        })?;
+        // Get safe mutable access to the packet
+        let mut tcp_packet =
+            MutableTcpPacket::new(&mut tcp_packet_buffer).ok_or(Error::PacketTooShort {
+                expected: TcpPacket::minimum_packet_size(),
+                actual: tcp_packet.len(),
+            })?;
 
-    // Edit the packet's checksum
-    tcp_packet.set_checksum(0);
-    tcp_packet.set_checksum(tcp::ipv4_checksum(
-        &tcp_packet.to_immutable(),
-        &new_source,
-        &new_destination,
-    ));
+        // Edit the packet's checksum
+        tcp_packet.set_checksum(0);
+        tcp_packet.set_checksum(tcp::ipv4_checksum(
+            &tcp_packet.to_immutable(),
+            &new_source,
+            &new_destination,
+        ));
 
-    // Return the translated packet
-    Ok(tcp_packet_buffer)
+        // Track the translated packet
+        #[cfg(feature = "metrics")]
+        protomask_metrics::metric!(PACKET_COUNTER, PROTOCOL_TCP, STATUS_TRANSLATED).inc();
+
+        // Return the translated packet
+        Ok(tcp_packet_buffer)
+    }
+    .map_err(|error| {
+        // Track the dropped packet
+        #[cfg(feature = "metrics")]
+        protomask_metrics::metric!(PACKET_COUNTER, PROTOCOL_TCP, STATUS_DROPPED).inc();
+
+        // Pass the error through
+        error
+    })
 }
 
 #[cfg(test)]

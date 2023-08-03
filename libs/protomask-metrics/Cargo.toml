@@ -1,0 +1,18 @@
+[package]
+name = "protomask-metrics"
+version = "0.1.0"
+authors = ["Evan Pratten <ewpratten@gmail.com>"]
+edition = "2021"
+description = "Internal metrics library used by protomask"
+readme = "README.md"
+homepage = "https://github.com/ewpratten/protomask/tree/master/libs/protomask-metrics"
+documentation = "https://docs.rs/protomask-metrics"
+repository = "https://github.com/ewpratten/protomask"
+license = "GPL-3.0"
+keywords = []
+categories = []
+
+[dependencies]
+log = "^0.4"
+prometheus = "0.13.3"
+lazy_static = "1.4.0"

@@ -12,7 +12,12 @@ license = "GPL-3.0"
 keywords = []
 categories = []
 
+[features]
+default = []
+metrics = ["protomask-metrics"]
+
 [dependencies]
+protomask-metrics = { path = "../protomask-metrics", optional = true }
 log = "^0.4"
 pnet = "0.34.0"
 thiserror = "^1.0.44"

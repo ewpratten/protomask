@@ -8,6 +8,18 @@ use std::{
 use ioctl_gen::{ioc, iow};
 use libc::{__c_anonymous_ifr_ifru, ifreq, ioctl, IFF_NO_PI, IFF_TUN, IF_NAMESIZE};
 
+/// Architecture / target environment specific definitions
+mod arch {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    pub type IoctlRequestType = libc::c_ulong;
+    #[cfg(all(target_os = "linux", target_env = "musl"))]
+    pub type IoctlRequestType = libc::c_int;
+    #[cfg(not(any(target_env = "gnu", target_env = "musl")))]
+    compile_error!(
+        "Unsupported target environment. Only gnu and musl targets are currently supported."
+    );
+}
+
 /// A TUN device
 pub struct Tun {
     /// Internal file descriptor for the TUN device
@@ -33,8 +45,8 @@ impl Tun {
 
         // Copy the device name into a C string with padding
         // NOTE: No zero padding is needed because we pre-init the array to all 0s
-        let mut dev_cstr = [0i8; IF_NAMESIZE];
-        let dev_bytes: Vec<i8> = dev.chars().map(|c| c as i8).collect();
+        let mut dev_cstr: [libc::c_char; IF_NAMESIZE] = [0; IF_NAMESIZE];
+        let dev_bytes: Vec<libc::c_char> = dev.chars().map(|c| c as libc::c_char).collect();
         let dev_len = dev_bytes.len().min(IF_NAMESIZE);
         log::trace!("Device name length after truncation: {}", dev_len);
         dev_cstr[..dev_len].copy_from_slice(&dev_bytes[..dev_len]);
@@ -52,7 +64,7 @@ impl Tun {
         let err = unsafe {
             ioctl(
                 fd.as_raw_fd(),
-                iow!('T', 202, size_of::<libc::c_int>()) as u64,
+                iow!('T', 202, size_of::<libc::c_int>()) as arch::IoctlRequestType,
                 &mut ifr,
             )
         };

@@ -11,7 +11,7 @@ on:
 
 jobs:
   build_and_test:
-    name: Run Tests
+    name: Build & Test
 
     # Use a build matrix to run this job targeting all supported platforms
     runs-on: ubuntu-latest
@@ -33,6 +33,12 @@ jobs:
           toolchain: ${{ matrix.rust_channel }}
           override: true
 
+      - name: Install cargo-deb
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-deb
+
       - name: Compile
         uses: actions-rs/cargo@v1
         with:
@@ -46,3 +52,16 @@ jobs:
           use-cross: true
           command: test
           args: --all --release --target ${{ matrix.target }}
+      
+      - name: Package DEB
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: deb
+          args: --target ${{ matrix.target }} --no-build
+
+      - name: Upload DEB
+        uses: actions/upload-artifact@v3
+        with:
+          name: debian-packages
+          path: target/${{ matrix.target }}/debian/*.deb

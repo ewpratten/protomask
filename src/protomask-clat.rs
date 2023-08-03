@@ -15,6 +15,8 @@ use std::{
     net::{Ipv4Addr, Ipv6Addr},
 };
 
+use crate::common::packet_handler::handle_packet;
+
 mod common;
 
 #[derive(Debug, Parser)]
@@ -23,6 +25,10 @@ struct Args {
     /// IPv6 prefix to embed IPv4 addresses in
     #[clap(long="via", default_value_t = ("64:ff9b::/96").parse().unwrap(), value_parser = parse_network_specific_prefix)]
     embed_prefix: Ipv6Net,
+
+    /// One or more customer-side IPv4 prefixes to allow through CLAT
+    #[clap(short = 'c', long = "customer-prefix", required = true)]
+    customer_pool: Vec<Ipv4Net>,
 
     /// Explicitly set the interface name to use
     #[clap(short, long, default_value_t = ("clat%d").to_string())]
@@ -52,22 +58,43 @@ pub async fn main() {
     let mut tun = Tun::new(&args.interface).unwrap();
     log::debug!("Created TUN interface: {}", tun.name());
 
-    // Configure the new interface
-    // - Bring up
-    // - Add IPv6 prefix as a route
-    // - Point IPv4 default route to the new interface
+    // Get the interface index
     let rt_handle = rtnl::new_handle().unwrap();
     let tun_link_idx = rtnl::link::get_link_index(&rt_handle, tun.name())
         .await
         .unwrap()
         .unwrap();
+
+    // Bring the interface up
     rtnl::link::link_up(&rt_handle, tun_link_idx).await.unwrap();
-    rtnl::route::route_add(IpNet::V6(args.embed_prefix), &rt_handle, tun_link_idx)
-        .await
-        .unwrap();
+
+    // Add an IPv4 default route towards the interface
     rtnl::route::route_add(IpNet::V4(Ipv4Net::default()), &rt_handle, tun_link_idx)
         .await
         .unwrap();
+
+    // Add an IPv6 route for each customer prefix
+    for customer_prefix in args.customer_pool {
+        let embedded_customer_prefix = unsafe {
+            Ipv6Net::new(
+                embed_ipv4_addr_unchecked(customer_prefix.addr(), args.embed_prefix),
+                args.embed_prefix.prefix_len() + customer_prefix.prefix_len(),
+            )
+            .unwrap_unchecked()
+        };
+        log::debug!(
+            "Adding route for {} to {}",
+            embedded_customer_prefix,
+            tun.name()
+        );
+        rtnl::route::route_add(
+            IpNet::V6(embedded_customer_prefix),
+            &rt_handle,
+            tun_link_idx,
+        )
+        .await
+        .unwrap();
+    }
 
     // Translate all incoming packets
     log::info!("Translating packets on {}", tun.name());
@@ -77,66 +104,27 @@ pub async fn main() {
         let len = tun.read(&mut buffer).unwrap();
 
         // Translate it based on the Layer 3 protocol number
-        let layer_3_proto = buffer[0] >> 4;
-        log::trace!("New packet with layer 3 protocol: {}", layer_3_proto);
-        match match layer_3_proto {
-            // IPv4
-            4 => translate_ipv4_to_ipv6(
-                &buffer[..len],
-                unsafe {
-                    embed_ipv4_addr_unchecked(
-                        Ipv4Addr::from(u32::from_be_bytes(buffer[12..16].try_into().unwrap())),
-                        args.embed_prefix,
-                    )
-                },
-                unsafe {
-                    embed_ipv4_addr_unchecked(
-                        Ipv4Addr::from(u32::from_be_bytes(buffer[16..20].try_into().unwrap())),
-                        args.embed_prefix,
-                    )
-                },
-            ),
-
-            // IPv6
-            6 => translate_ipv6_to_ipv4(
-                &buffer[..len],
-                unsafe {
-                    extract_ipv4_addr_unchecked(
-                        Ipv6Addr::from(u128::from_be_bytes(buffer[8..24].try_into().unwrap())),
-                        args.embed_prefix.prefix_len(),
-                    )
-                },
-                unsafe {
-                    extract_ipv4_addr_unchecked(
-                        Ipv6Addr::from(u128::from_be_bytes(buffer[24..40].try_into().unwrap())),
-                        args.embed_prefix.prefix_len(),
-                    )
-                },
-            ),
-            // Unknown
-            proto => {
-                log::warn!("Unknown Layer 3 protocol: {}", proto);
-                continue;
-            }
-        } {
-            Ok(data) => {
-                // Write the translated packet back to the TUN interface
-                tun.write(&data).unwrap();
-            }
-            Err(error) => match error {
-                interproto::error::Error::PacketTooShort { expected, actual } => log::warn!(
-                    "Got packet with length {} when expecting at least {} bytes",
-                    actual,
-                    expected
-                ),
-                interproto::error::Error::UnsupportedIcmpType(icmp_type) => {
-                    log::warn!("Got a packet with an unsupported ICMP type: {}", icmp_type)
-                }
-                interproto::error::Error::UnsupportedIcmpv6Type(icmpv6_type) => log::warn!(
-                    "Got a packet with an unsupported ICMPv6 type: {}",
-                    icmpv6_type
-                ),
+        if let Some(output) = handle_packet(
+            &buffer[..len],
+            // IPv4 -> IPv6
+            |packet, source, dest| {
+                translate_ipv4_to_ipv6(
+                    packet,
+                    unsafe { embed_ipv4_addr_unchecked(*source, args.embed_prefix) },
+                    unsafe { embed_ipv4_addr_unchecked(*dest, args.embed_prefix) },
+                )
             },
-        };
+            // IPv6 -> IPv4
+            |packet, source, dest| {
+                translate_ipv6_to_ipv4(
+                    packet,
+                    unsafe { extract_ipv4_addr_unchecked(*source, args.embed_prefix.prefix_len()) },
+                    unsafe { extract_ipv4_addr_unchecked(*dest, args.embed_prefix.prefix_len()) },
+                )
+            },
+        ) {
+            // Write the packet if we get one back from the handler functions
+            tun.write(&output).unwrap();
+        }
     }
 }

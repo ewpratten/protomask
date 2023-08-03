@@ -37,7 +37,7 @@ pub fn translate_icmp_to_icmpv6(
         Icmpv6Types::TimeExceeded => {
             // Time exceeded messages contain the original IPv4 header and part of the payload. (with 4 bytes of forward padding)
             // We need to translate the IPv4 header and the payload, but keep the padding
-            let mut output = vec![0u8; icmp_packet.payload().len()];
+            let mut output = vec![0u8; 4];
             output.copy_from_slice(&icmp_packet.payload()[..4]);
             output.extend_from_slice(&translate_ipv4_to_ipv6(
                 &icmp_packet.payload()[4..],
@@ -98,7 +98,7 @@ pub fn translate_icmpv6_to_icmp(
         IcmpTypes::TimeExceeded => {
             // Time exceeded messages contain the original IPv6 header and part of the payload. (with 4 bytes of forward padding)
             // We need to translate the IPv6 header and the payload, but keep the padding
-            let mut output = vec![0u8; icmpv6_packet.payload().len()];
+            let mut output = vec![0u8; 4];
             output.copy_from_slice(&icmpv6_packet.payload()[..4]);
             output.extend_from_slice(&translate_ipv6_to_ipv4(
                 &icmpv6_packet.payload()[4..],

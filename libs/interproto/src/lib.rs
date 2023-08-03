@@ -5,5 +5,5 @@
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::doc_markdown)]
 
-pub mod protocols;
 pub mod error;
+pub mod protocols;

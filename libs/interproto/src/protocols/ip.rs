@@ -2,7 +2,8 @@
 
 use super::{
     icmp::{translate_icmp_to_icmpv6, translate_icmpv6_to_icmp},
-    tcp::{recalculate_tcp_checksum_ipv4, recalculate_tcp_checksum_ipv6}, udp::{recalculate_udp_checksum_ipv6, recalculate_udp_checksum_ipv4},
+    tcp::{recalculate_tcp_checksum_ipv4, recalculate_tcp_checksum_ipv6},
+    udp::{recalculate_udp_checksum_ipv4, recalculate_udp_checksum_ipv6},
 };
 use crate::error::{Error, Result};
 use pnet::packet::{
@@ -127,7 +128,11 @@ pub fn translate_ipv6_to_ipv4(
     });
     ipv4_packet.set_source(new_source);
     ipv4_packet.set_destination(new_destination);
-    ipv4_packet.set_total_length((Ipv4Packet::minimum_packet_size() + new_payload.len()).try_into().unwrap());
+    ipv4_packet.set_total_length(
+        (Ipv4Packet::minimum_packet_size() + new_payload.len())
+            .try_into()
+            .unwrap(),
+    );
 
     // Copy the payload to the buffer
     ipv4_packet.set_payload(&new_payload);

@@ -65,6 +65,7 @@ pub fn translate_ipv4_to_ipv6(
     ipv6_packet.set_hop_limit(ipv4_packet.get_ttl());
     ipv6_packet.set_source(new_source);
     ipv6_packet.set_destination(new_destination);
+    ipv6_packet.set_payload_length(new_payload.len().try_into().unwrap());
 
     // Copy the payload to the buffer
     ipv6_packet.set_payload(&new_payload);
@@ -118,6 +119,7 @@ pub fn translate_ipv6_to_ipv4(
 
     // Set the header fields
     ipv4_packet.set_version(4);
+    ipv4_packet.set_header_length(5);
     ipv4_packet.set_ttl(ipv6_packet.get_hop_limit());
     ipv4_packet.set_next_level_protocol(match ipv6_packet.get_next_header() {
         IpNextHeaderProtocols::Icmpv6 => IpNextHeaderProtocols::Icmp,
@@ -125,6 +127,7 @@ pub fn translate_ipv6_to_ipv4(
     });
     ipv4_packet.set_source(new_source);
     ipv4_packet.set_destination(new_destination);
+    ipv4_packet.set_total_length((Ipv4Packet::minimum_packet_size() + new_payload.len()).try_into().unwrap());
 
     // Copy the payload to the buffer
     ipv4_packet.set_payload(&new_payload);

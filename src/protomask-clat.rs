@@ -19,7 +19,7 @@ mod common;
 #[derive(Debug, Parser)]
 #[clap(author, version, about="IPv4 to IPv6 Customer-side transLATor (CLAT)", long_about = None)]
 struct Args {
-    /// IPv6 prefix to embed IPv4 addresses in
+    /// RFC6052 IPv6 prefix to encapsulate IPv4 packets within
     #[clap(long="via", default_value_t = ("64:ff9b::/96").parse().unwrap(), value_parser = parse_network_specific_prefix)]
     embed_prefix: Ipv6Net,
 

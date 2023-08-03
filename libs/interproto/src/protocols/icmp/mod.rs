@@ -28,6 +28,16 @@ pub fn translate_icmp_to_icmpv6(
             actual: icmp_packet.len(),
         })?;
 
+        // Track the incoming packet's type and code
+        #[cfg(feature = "metrics")]
+        protomask_metrics::metrics::ICMP_COUNTER
+            .with_label_values(&[
+                protomask_metrics::metrics::label_values::PROTOCOL_ICMP,
+                &icmp_packet.get_icmp_type().0.to_string(),
+                &icmp_packet.get_icmp_code().0.to_string(),
+            ])
+            .inc();
+
         // Translate the ICMP type and code to their ICMPv6 equivalents
         let (icmpv6_type, icmpv6_code) = type_code::translate_type_and_code_4_to_6(
             icmp_packet.get_icmp_type(),
@@ -104,6 +114,16 @@ pub fn translate_icmpv6_to_icmp(
             actual: icmpv6_packet.len(),
         })?;
 
+        // Track the incoming packet's type and code
+        #[cfg(feature = "metrics")]
+        protomask_metrics::metrics::ICMP_COUNTER
+            .with_label_values(&[
+                protomask_metrics::metrics::label_values::PROTOCOL_ICMPV6,
+                &icmpv6_packet.get_icmpv6_type().0.to_string(),
+                &icmpv6_packet.get_icmpv6_code().0.to_string(),
+            ])
+            .inc();
+
         // Translate the ICMPv6 type and code to their ICMP equivalents
         let (icmp_type, icmp_code) = type_code::translate_type_and_code_6_to_4(
             icmpv6_packet.get_icmpv6_type(),
@@ -143,10 +163,6 @@ pub fn translate_icmpv6_to_icmp(
 
         // Calculate the checksum
         icmp_packet.set_checksum(icmp::checksum(&icmp_packet.to_immutable()));
-
-        // Track the translated packet
-        #[cfg(feature = "metrics")]
-        protomask_metrics::metric!(PACKET_COUNTER, PROTOCOL_ICMPV6, STATUS_TRANSLATED).inc();
 
         // Return the translated packet
         Ok(output_buffer)

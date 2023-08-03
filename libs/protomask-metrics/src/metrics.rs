@@ -27,4 +27,11 @@ lazy_static! {
         "Number of packets processed",
         &["protocol", "status"]
     ).unwrap();
+
+    /// Counter for the number of different types of ICMP packets received
+    pub static ref ICMP_COUNTER: prometheus::IntCounterVec = prometheus::register_int_counter_vec!(
+        "protomask_icmp_packets_recv",
+        "Number of ICMP packets received",
+        &["protocol", "icmp_type", "icmp_code"]
+    ).unwrap();
 }

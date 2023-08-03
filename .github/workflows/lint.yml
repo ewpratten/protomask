@@ -1,0 +1,36 @@
+name: Lint
+
+on:
+  push:
+    paths: 
+      - '.github/workflows/lint.yml'
+      - '**/Cargo.toml'
+      - '**/*.rs'
+
+permissions:
+    checks: write
+    contents: read
+
+jobs:
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v1
+        - name: Install clippy
+          run: rustup component add clippy
+        - name: Run clippy
+          uses: actions-rs/clippy-check@v1
+          with:
+            token: ${{ secrets.GITHUB_TOKEN }}
+            args: --all-features
+
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v1
+        - name: Install rustfmt
+          run: rustup component add rustfmt
+        - name: Check formatting
+          run: cargo fmt --all --check

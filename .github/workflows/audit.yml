@@ -1,4 +1,4 @@
-name: Security audit
+name: Audit
 
 on:
   push:
@@ -17,7 +17,8 @@ permissions:
   contents: read
 
 jobs:
-  security_audit:
+  rust_audit:
+    name: Rust Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1

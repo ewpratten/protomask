@@ -10,10 +10,7 @@ use interproto::protocols::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use nix::unistd::Uid;
 use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
-use std::{
-    io::{Read, Write},
-    net::{Ipv4Addr, Ipv6Addr},
-};
+use std::io::{Read, Write};
 
 use crate::common::packet_handler::handle_packet;
 
@@ -124,7 +121,7 @@ pub async fn main() {
             },
         ) {
             // Write the packet if we get one back from the handler functions
-            tun.write(&output).unwrap();
+            tun.write_all(&output).unwrap();
         }
     }
 }

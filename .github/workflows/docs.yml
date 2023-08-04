@@ -5,7 +5,9 @@ on:
   push:
     paths:
       - ".github/workflows/docs.yml"
-      - "docs/**"
+      - "docs/book/**"
+      - "**/src/*"
+      - "libs/**/README.md"
       - "book.toml"
 
 jobs:

@@ -5,6 +5,7 @@
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::doc_markdown)]
 
+pub mod http;
 pub mod metrics;
 
 #[macro_use]

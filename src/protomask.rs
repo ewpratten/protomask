@@ -9,7 +9,7 @@ use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
 use std::{
     cell::RefCell,
     io::{BufRead, Read, Write},
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
     time::Duration,
 };
@@ -21,16 +21,20 @@ mod common;
 #[derive(Parser)]
 #[clap(author, version, about="Fast and simple NAT64", long_about = None)]
 struct Args {
-    /// RFC6052 IPv6 translation prefix
-    #[clap(long, default_value_t = ("64:ff9b::/96").parse().unwrap(), value_parser = parse_network_specific_prefix)]
-    translation_prefix: Ipv6Net,
-
     #[command(flatten)]
     pool: PoolArgs,
 
     /// A CSV file containing static address mappings from IPv6 to IPv4
     #[clap(long = "static-file")]
     static_file: Option<PathBuf>,
+
+    /// Enable prometheus metrics on a given address
+    #[clap(long = "prometheus")]
+    prom_bind_addr: Option<SocketAddr>,
+
+    /// RFC6052 IPv6 translation prefix
+    #[clap(long, default_value_t = ("64:ff9b::/96").parse().unwrap(), value_parser = parse_network_specific_prefix)]
+    translation_prefix: Ipv6Net,
 
     /// NAT reservation timeout in seconds
     #[clap(long, default_value = "7200")]
@@ -148,6 +152,12 @@ pub async fn main() {
             .get_mut()
             .insert_static(v4_addr, v6_addr)
             .unwrap();
+    }
+
+    // If we are configured to serve prometheus metrics, start the server
+    if let Some(bind_addr) = args.prom_bind_addr {
+        log::info!("Starting prometheus server on {}", bind_addr);
+        tokio::spawn(protomask_metrics::http::serve_metrics(bind_addr));
     }
 
     // Translate all incoming packets

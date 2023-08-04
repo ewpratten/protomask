@@ -10,7 +10,10 @@ use interproto::protocols::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use nix::unistd::Uid;
 use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    net::SocketAddr,
+};
 
 use crate::common::packet_handler::handle_packet;
 
@@ -19,13 +22,17 @@ mod common;
 #[derive(Debug, Parser)]
 #[clap(author, version, about="IPv4 to IPv6 Customer-side transLATor (CLAT)", long_about = None)]
 struct Args {
-    /// RFC6052 IPv6 prefix to encapsulate IPv4 packets within
-    #[clap(long="via", default_value_t = ("64:ff9b::/96").parse().unwrap(), value_parser = parse_network_specific_prefix)]
-    embed_prefix: Ipv6Net,
-
     /// One or more customer-side IPv4 prefixes to allow through CLAT
     #[clap(short = 'c', long = "customer-prefix", required = true)]
     customer_pool: Vec<Ipv4Net>,
+
+    /// Enable prometheus metrics on a given address
+    #[clap(long = "prometheus")]
+    prom_bind_addr: Option<SocketAddr>,
+
+    /// RFC6052 IPv6 prefix to encapsulate IPv4 packets within
+    #[clap(long="via", default_value_t = ("64:ff9b::/96").parse().unwrap(), value_parser = parse_network_specific_prefix)]
+    embed_prefix: Ipv6Net,
 
     /// Explicitly set the interface name to use
     #[clap(short, long, default_value_t = ("clat%d").to_string())]
@@ -91,6 +98,12 @@ pub async fn main() {
         )
         .await
         .unwrap();
+    }
+
+    // If we are configured to serve prometheus metrics, start the server
+    if let Some(bind_addr) = args.prom_bind_addr {
+        log::info!("Starting prometheus server on {}", bind_addr);
+        tokio::spawn(protomask_metrics::http::serve_metrics(bind_addr));
     }
 
     // Translate all incoming packets

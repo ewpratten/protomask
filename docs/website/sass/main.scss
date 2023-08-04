@@ -5,3 +5,17 @@
     font-weight: bold;
   }
 }
+
+@media screen and (max-width: 405px) {
+  .navbar-brand{
+    display:none;
+  }
+}
+
+#hero-title {
+  font-size:5em;
+
+  @media screen and (max-width: 420px) {
+    font-size: 3em;
+  }
+}

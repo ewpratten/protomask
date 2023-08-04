@@ -29,3 +29,6 @@ jobs:
         env:
           BUILD_DIR: ./docs/website
           BUILD_ONLY: true
+
+      - name: Combine Book and Website
+        run: mkdir -p /tmp/combined && cp -rv docs/website/* /tmp/combined && cp -rv book/ /tmp/combined/book 

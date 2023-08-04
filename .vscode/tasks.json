@@ -4,6 +4,9 @@
 		{
 			"type": "cargo",
 			"command": "build",
+			"args": [
+				"--workspace"
+			],
 			"problemMatcher": [
 				"$rustc",
 				"$rust-panic"
@@ -14,12 +17,25 @@
 		{
 			"type": "cargo",
 			"command": "test",
+			"args": [
+				"--workspace"
+			],
 			"problemMatcher": [
 				"$rustc",
 				"$rust-panic"
 			],
 			"group": "test",
 			"label": "rust: cargo test"
-		} 
+		},
+		{
+			"type": "shell",
+			"command": "zola",
+			"args": [
+				"-r",
+				"docs/website",
+				"serve"
+			],
+			"label": "zola: serve website"
+		}
 	]
 }

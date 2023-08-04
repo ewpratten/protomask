@@ -5,7 +5,9 @@
 
 **Fast & reliable user space [NAT64](https://en.wikipedia.org/wiki/NAT64).**
 
-This repository contains:
+For user-oriented documentation, see the [protomask website](https://protomask.ewpratten.com).
+
+## Table of Contents
 
 | Crate | Info |
 | -- | -- |
@@ -17,7 +19,7 @@ This repository contains:
 | [`rfc6052`](./libs/rfc6052/) | [![Crates.io](https://img.shields.io/crates/v/rfc6052)](https://crates.io/crates/rfc6052) [![Docs.rs](https://docs.rs/rfc6052/badge.svg)](https://docs.rs/rfc6052) |
 | [`rtnl`](./libs/rtnl/) | [![Crates.io](https://img.shields.io/crates/v/rtnl)](https://crates.io/crates/rtnl) [![Docs.rs](https://docs.rs/rtnl/badge.svg)](https://docs.rs/rtnl) |
 
-For user-oriented documentation, see the [protomask website](https://protomask.ewpratten.com).
+
 
 ## Installation
 

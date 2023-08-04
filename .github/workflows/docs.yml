@@ -13,6 +13,10 @@ jobs:
     name: Build Docs
     runs-on: ubuntu-latest
 
+    permissions:
+      pages: write
+      id-token: write
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -36,6 +40,9 @@ jobs:
 
       - name: Combine Book and Website
         run: mkdir -p /tmp/combined && cp -rv docs/website/* /tmp/combined && cp -rv target/book/ /tmp/combined/book
+
+      - name: Write CNAME file
+        run: echo "protomask.ewpratten.com" > /tmp/combined/CNAME
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2

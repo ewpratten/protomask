@@ -39,7 +39,7 @@ jobs:
           BUILD_ONLY: true
 
       - name: Combine Book and Website
-        run: mkdir -p /tmp/combined && cp -rv docs/website/* /tmp/combined && cp -rv target/book/ /tmp/combined/book
+        run: mkdir -p /tmp/combined && cp -rv docs/website/public/* /tmp/combined && cp -rv target/book/ /tmp/combined/book
 
       - name: Write CNAME file
         run: echo "protomask.ewpratten.com" > /tmp/combined/CNAME

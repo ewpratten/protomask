@@ -182,13 +182,17 @@ impl CrossProtocolNetworkAddressTableWithIpv4Pool {
         let new_address = self
             .pool
             .iter()
-            .map(|(network_address, netmask)| (*network_address, *network_address | !netmask))
-            .find(|(network_address, _)| self.table.get_ipv6(*network_address).is_none())
-            .map(|(_, new_address)| new_address)
+            .map(|(network_address, netmask)| (*network_address)..(*network_address | !netmask))
+            .find_map(|mut addr_range| addr_range.find(|addr| !self.table.get_ipv6(*addr).is_some()))
             .ok_or(Error::Ipv4PoolExhausted(self.max_mappings))?;
 
         // Insert the new mapping
         self.table.insert(new_address, ipv6, self.timeout);
+        log::info!(
+            "New cross-protocol address mapping: {:02x} -> {:02x}",
+            ipv6,
+            new_address
+        );
 
         // Return the new address
         Ok(new_address)

@@ -142,7 +142,7 @@ pub async fn main() {
     let mut addr_table = RefCell::new(CrossProtocolNetworkAddressTableWithIpv4Pool::new(
         pool_prefixes
             .iter()
-            .map(|prefix| (u32::from(prefix.addr()), prefix.prefix_len() as u32))
+            .map(|prefix| (u32::from(prefix.addr()), u32::from(prefix.netmask())))
             .collect::<Vec<(u32, u32)>>()
             .as_slice(),
         Duration::from_secs(args.reservation_timeout),

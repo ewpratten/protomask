@@ -1,9 +1,8 @@
-# protomask
+# Protomask: Fast & reliable user space NAT64
 [![GitHub release](https://img.shields.io/github/v/release/ewpratten/protomask)](https://github.com/ewpratten/protomask/releases/latest)
 [![Build](https://github.com/Ewpratten/protomask/actions/workflows/build.yml/badge.svg)](https://github.com/ewpratten/protomask/actions/workflows/build.yml)
 [![Audit](https://github.com/ewpratten/protomask/actions/workflows/audit.yml/badge.svg)](https://github.com/ewpratten/protomask/actions/workflows/audit.yml)
 
-**Fast & reliable user space [NAT64](https://en.wikipedia.org/wiki/NAT64).**
 
 For user-oriented documentation, see the [protomask website](https://protomask.ewpratten.com).
 

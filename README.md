@@ -3,7 +3,7 @@
 [![Build](https://github.com/Ewpratten/protomask/actions/workflows/build.yml/badge.svg)](https://github.com/ewpratten/protomask/actions/workflows/build.yml)
 [![Audit](https://github.com/ewpratten/protomask/actions/workflows/audit.yml/badge.svg)](https://github.com/ewpratten/protomask/actions/workflows/audit.yml)
 
-**A user space [NAT64](https://en.wikipedia.org/wiki/NAT64) implementation.**
+**Fast & reliable user space [NAT64](https://en.wikipedia.org/wiki/NAT64).**
 
 This repository contains:
 

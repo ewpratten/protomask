@@ -140,11 +140,7 @@ pub async fn main() {
 
     // Set up the address table
     let mut addr_table = RefCell::new(CrossProtocolNetworkAddressTableWithIpv4Pool::new(
-        pool_prefixes
-            .iter()
-            .map(|prefix| (u32::from(prefix.addr()), u32::from(prefix.netmask())))
-            .collect::<Vec<(u32, u32)>>()
-            .as_slice(),
+        &pool_prefixes,
         Duration::from_secs(args.reservation_timeout),
     ));
     for (v6_addr, v4_addr) in args.get_static_reservations().unwrap() {
@@ -171,7 +167,7 @@ pub async fn main() {
         if let Some(output) = handle_packet(
             &buffer[..len],
             // IPv4 -> IPv6
-            |packet, source, dest| match addr_table.borrow().get_ipv6(*dest) {
+            |packet, source, dest| match addr_table.borrow().get_ipv6(dest) {
                 Some(new_destination) => Ok(translate_ipv4_to_ipv6(
                     packet,
                     unsafe { embed_ipv4_addr_unchecked(*source, args.translation_prefix) },
@@ -187,7 +183,7 @@ pub async fn main() {
             |packet, source, dest| {
                 Ok(translate_ipv6_to_ipv4(
                     packet,
-                    addr_table.borrow_mut().get_or_create_ipv4(*source)?.into(),
+                    addr_table.borrow_mut().get_or_create_ipv4(source)?.into(),
                     unsafe {
                         extract_ipv4_addr_unchecked(*dest, args.translation_prefix.prefix_len())
                     },

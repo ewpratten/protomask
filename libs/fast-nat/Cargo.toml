@@ -16,3 +16,4 @@ categories = []
 log = "^0.4"
 rustc-hash = "1.1.0"
 thiserror = "^1.0.44"
+ipnet = "^2.8.0"

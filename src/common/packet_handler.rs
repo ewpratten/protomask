@@ -90,8 +90,8 @@ where
                 );
                 None
             }
-            PacketHandlingError::FastNatError(fast_nat::error::Error::Ipv4PoolExhausted(size)) => {
-                log::warn!("IPv4 pool exhausted with {} mappings", size);
+            PacketHandlingError::FastNatError(fast_nat::error::Error::Ipv4PoolExhausted) => {
+                log::warn!("IPv4 pool exhausted. Dropping packet.");
                 None
             }
             PacketHandlingError::FastNatError(fast_nat::error::Error::InvalidIpv4Address(addr)) => {

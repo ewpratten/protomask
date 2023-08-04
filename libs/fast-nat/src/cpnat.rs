@@ -1,5 +1,9 @@
-use std::time::Duration;
+use std::{
+    net::{Ipv4Addr, Ipv6Addr},
+    time::Duration,
+};
 
+use ipnet::Ipv4Net;
 use rustc_hash::FxHashMap;
 
 use crate::{bimap::BiHashMap, error::Error, timeout::MaybeTimeout};
@@ -50,7 +54,7 @@ impl CrossProtocolNetworkAddressTable {
     }
 
     /// Insert a new indefinite mapping
-    pub fn insert_indefinite<T4: Into<u32>, T6: Into<u128>>(&mut self, ipv4: T4, ipv6: T6) {
+    pub fn insert_indefinite(&mut self, ipv4: Ipv4Addr, ipv6: Ipv6Addr) {
         self.prune();
         let (ipv4, ipv6) = (ipv4.into(), ipv6.into());
         self.addr_map.insert(ipv4, ipv6);
@@ -58,12 +62,7 @@ impl CrossProtocolNetworkAddressTable {
     }
 
     /// Insert a new mapping with a finite time-to-live
-    pub fn insert<T4: Into<u32>, T6: Into<u128>>(
-        &mut self,
-        ipv4: T4,
-        ipv6: T6,
-        duration: Duration,
-    ) {
+    pub fn insert(&mut self, ipv4: Ipv4Addr, ipv6: Ipv6Addr, duration: Duration) {
         self.prune();
         let (ipv4, ipv6) = (ipv4.into(), ipv6.into());
         self.addr_map.insert(ipv4, ipv6);
@@ -78,14 +77,18 @@ impl CrossProtocolNetworkAddressTable {
 
     /// Get the IPv6 address for a given IPv4 address
     #[must_use]
-    pub fn get_ipv6<T: Into<u32>>(&self, ipv4: T) -> Option<u128> {
-        self.addr_map.get_right(&ipv4.into()).copied()
+    pub fn get_ipv6(&self, ipv4: &Ipv4Addr) -> Option<Ipv6Addr> {
+        self.addr_map
+            .get_right(&(*ipv4).into())
+            .map(|addr| (*addr).into())
     }
 
     /// Get the IPv4 address for a given IPv6 address
     #[must_use]
-    pub fn get_ipv4<T: Into<u128>>(&self, ipv6: T) -> Option<u32> {
-        self.addr_map.get_left(&ipv6.into()).copied()
+    pub fn get_ipv4(&self, ipv6: &Ipv6Addr) -> Option<Ipv4Addr> {
+        self.addr_map
+            .get_left(&(*ipv6).into())
+            .map(|addr| (*addr).into())
     }
 
     /// Get the number of mappings in the table
@@ -115,49 +118,25 @@ pub struct CrossProtocolNetworkAddressTableWithIpv4Pool {
     /// Internal table
     table: CrossProtocolNetworkAddressTable,
     /// Internal pool of IPv4 prefixes to assign new mappings from
-    pool: Vec<(u32, u32)>,
+    pool: Vec<Ipv4Net>,
     /// The timeout to use for new entries
     timeout: Duration,
-    /// The pre-calculated maximum number of mappings that can be created
-    max_mappings: usize,
 }
 
 impl CrossProtocolNetworkAddressTableWithIpv4Pool {
     /// Construct a new Cross-protocol network address table with a given IPv4 pool
     #[must_use]
-    pub fn new<T: Into<u32> + Clone>(pool: &[(T, T)], timeout: Duration) -> Self {
+    pub fn new(pool: &[Ipv4Net], timeout: Duration) -> Self {
         Self {
             table: CrossProtocolNetworkAddressTable::default(),
-            pool: pool
-                .iter()
-                .map(|(a, b)| (a.clone().into(), b.clone().into()))
-                .collect(),
+            pool: pool.to_vec(),
             timeout,
-            max_mappings: pool
-                .iter()
-                .map(|(_, netmask)| (*netmask).clone().into() as usize)
-                .map(|netmask| !netmask)
-                .sum(),
         }
     }
 
-    /// Check if the pool contains an address
-    #[must_use]
-    pub fn contains<T: Into<u32>>(&self, addr: T) -> bool {
-        let addr = addr.into();
-        self.pool
-            .iter()
-            .any(|(network_addr, netmask)| (addr & netmask) == *network_addr)
-    }
-
     /// Insert a new static mapping
-    pub fn insert_static<T4: Into<u32>, T6: Into<u128>>(
-        &mut self,
-        ipv4: T4,
-        ipv6: T6,
-    ) -> Result<(), Error> {
-        let (ipv4, ipv6) = (ipv4.into(), ipv6.into());
-        if !self.contains(ipv4) {
+    pub fn insert_static(&mut self, ipv4: Ipv4Addr, ipv6: Ipv6Addr) -> Result<(), Error> {
+        if !self.pool.iter().any(|prefix| prefix.contains(&ipv4)) {
             return Err(Error::InvalidIpv4Address(ipv4));
         }
         self.table.insert_indefinite(ipv4, ipv6);
@@ -165,31 +144,25 @@ impl CrossProtocolNetworkAddressTableWithIpv4Pool {
     }
 
     /// Gets the IPv4 address for a given IPv6 address or inserts a new mapping if one does not exist (if possible)
-    pub fn get_or_create_ipv4<T: Into<u128>>(&mut self, ipv6: T) -> Result<u32, Error> {
-        let ipv6 = ipv6.into();
-
+    pub fn get_or_create_ipv4(&mut self, ipv6: &Ipv6Addr) -> Result<Ipv4Addr, Error> {
         // Return the known mapping if it exists
         if let Some(ipv4) = self.table.get_ipv4(ipv6) {
             return Ok(ipv4);
-        }
-
-        // Otherwise, we first need to make sure there is actually room for a new mapping
-        if self.table.len() >= self.max_mappings {
-            return Err(Error::Ipv4PoolExhausted(self.max_mappings));
         }
 
         // Find the next available IPv4 address in the pool
         let new_address = self
             .pool
             .iter()
-            .map(|(network_address, netmask)| (*network_address)..(*network_address | !netmask))
-            .find_map(|mut addr_range| addr_range.find(|addr| !self.table.get_ipv6(*addr).is_some()))
-            .ok_or(Error::Ipv4PoolExhausted(self.max_mappings))?;
+            .map(|prefix| prefix.hosts())
+            .flatten()
+            .find(|addr| !self.table.get_ipv6(addr).is_some())
+            .ok_or(Error::Ipv4PoolExhausted)?;
 
         // Insert the new mapping
-        self.table.insert(new_address, ipv6, self.timeout);
+        self.table.insert(new_address, *ipv6, self.timeout);
         log::info!(
-            "New cross-protocol address mapping: {:02x} -> {:02x}",
+            "New cross-protocol address mapping: {} -> {}",
             ipv6,
             new_address
         );
@@ -200,7 +173,7 @@ impl CrossProtocolNetworkAddressTableWithIpv4Pool {
 
     /// Gets the IPv6 address for a given IPv4 address if it exists
     #[must_use]
-    pub fn get_ipv6<T: Into<u32>>(&self, ipv4: T) -> Option<u128> {
+    pub fn get_ipv6(&self, ipv4: &Ipv4Addr) -> Option<Ipv6Addr> {
         self.table.get_ipv6(ipv4)
     }
 }

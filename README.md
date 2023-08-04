@@ -4,9 +4,9 @@
 [![Audit](https://github.com/ewpratten/protomask/actions/workflows/audit.yml/badge.svg)](https://github.com/ewpratten/protomask/actions/workflows/audit.yml)
 
 
-For user-oriented documentation, see the [protomask website](https://protomask.ewpratten.com).
+Protomask is a user space [NAT64](https://en.wikipedia.org/wiki/NAT64) implementation geared towards networks that need fast and reliable inter-protocol packet translation. Behind the scenes, protomask uses the [Universal TUN/TAP Device Driver](https://docs.kernel.org/networking/tuntap.html) to translate incoming packets from IPv4 to IPv6 and vice-versa.
 
-## Table of Contents
+## Latest Releases
 
 | Crate | Info |
 | -- | -- |
@@ -18,7 +18,27 @@ For user-oriented documentation, see the [protomask website](https://protomask.e
 | [`rfc6052`](./libs/rfc6052/) | [![Crates.io](https://img.shields.io/crates/v/rfc6052)](https://crates.io/crates/rfc6052) [![Docs.rs](https://docs.rs/rfc6052/badge.svg)](https://docs.rs/rfc6052) |
 | [`rtnl`](./libs/rtnl/) | [![Crates.io](https://img.shields.io/crates/v/rtnl)](https://crates.io/crates/rtnl) [![Docs.rs](https://docs.rs/rtnl/badge.svg)](https://docs.rs/rtnl) |
 
+## The protomask tool suite
 
+To accomplish the various translation needs of an IPv6-only or dual-stack ISP, the protomask tool suite includes a few tools:
+
+- **`protomask`**: The main NAT64 daemon
+  - Translates IPv6 packets using *RFC6052 IPv4-Embedded IPv6 Addressing* to native IPv4 traffic
+  - Can handle high volumes of traffic from multiple clients simultaneously
+- **`protomask-clat`**: A Customer-side transLATor (CLAT) implementation
+  - Intended to be deployed at the customer edge to pass IPv4 traffic over an IPv6-only ISP's network
+
+Every tool in the protomask suite is easy to deploy and configure, plus supports optionally exposing Prometheus metrics for remote monitoring.
+
+## The protomask library suite
+
+The development of protomask necessitated the creation of a few specialized software libraries. Since the technology developed for protomask is useful outside of the scope of this project, these libraries are also available for general use:
+
+- **`easy-tun`**: A minimal TUN interface library
+- **`fast-nat`**: A library designed for highly efficient mapping and lookup of IP address pairs
+- **`interproto`**: The heart of protomask, a library for translating many types of packets between layer 3 protocols
+- **`rfc6052`**: A Rust implementation of RFC6052
+- **`rtnl`**: A high-level wrapper around `rtnetlink`
 
 ## Installation
 

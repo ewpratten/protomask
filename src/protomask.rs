@@ -171,7 +171,7 @@ pub async fn main() {
                 Some(new_destination) => Ok(translate_ipv4_to_ipv6(
                     packet,
                     unsafe { embed_ipv4_addr_unchecked(*source, args.translation_prefix) },
-                    new_destination.into(),
+                    new_destination,
                 )
                 .map(Some)?),
                 None => {
@@ -183,7 +183,7 @@ pub async fn main() {
             |packet, source, dest| {
                 Ok(translate_ipv6_to_ipv4(
                     packet,
-                    addr_table.borrow_mut().get_or_create_ipv4(source)?.into(),
+                    addr_table.borrow_mut().get_or_create_ipv4(source)?,
                     unsafe {
                         extract_ipv4_addr_unchecked(*dest, args.translation_prefix.prefix_len())
                     },

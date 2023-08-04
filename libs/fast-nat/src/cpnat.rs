@@ -154,9 +154,8 @@ impl CrossProtocolNetworkAddressTableWithIpv4Pool {
         let new_address = self
             .pool
             .iter()
-            .map(|prefix| prefix.hosts())
-            .flatten()
-            .find(|addr| !self.table.get_ipv6(addr).is_some())
+            .flat_map(Ipv4Net::hosts)
+            .find(|addr| self.table.get_ipv6(addr).is_none())
             .ok_or(Error::Ipv4PoolExhausted)?;
 
         // Insert the new mapping

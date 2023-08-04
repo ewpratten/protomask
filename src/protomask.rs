@@ -69,7 +69,7 @@ struct PoolArgs {
 impl PoolArgs {
     /// Read all pool prefixes from the chosen source
     pub fn prefixes(&self) -> Result<Vec<Ipv4Net>, Box<dyn std::error::Error>> {
-        match self.pool_prefixes.len() > 0 {
+        match !self.pool_prefixes.is_empty() {
             true => Ok(self.pool_prefixes.clone()),
             false => {
                 let mut prefixes = Vec::new();
@@ -139,7 +139,8 @@ pub async fn main() {
         pool_prefixes
             .iter()
             .map(|prefix| (u32::from(prefix.addr()), prefix.prefix_len() as u32))
-            .collect(),
+            .collect::<Vec<(u32, u32)>>()
+            .as_slice(),
         Duration::from_secs(args.reservation_timeout),
     ));
     for (v6_addr, v4_addr) in args.get_static_reservations().unwrap() {
@@ -166,7 +167,7 @@ pub async fn main() {
                     unsafe { embed_ipv4_addr_unchecked(*source, args.translation_prefix) },
                     new_destination.into(),
                 )
-                .map(|output| Some(output))?),
+                .map(Some)?),
                 None => {
                     protomask_metrics::metric!(PACKET_COUNTER, PROTOCOL_IPV4, STATUS_DROPPED);
                     Ok(None)
@@ -176,15 +177,12 @@ pub async fn main() {
             |packet, source, dest| {
                 Ok(translate_ipv6_to_ipv4(
                     packet,
-                    addr_table
-                        .borrow_mut()
-                        .get_or_create_ipv4(source.clone())?
-                        .into(),
+                    addr_table.borrow_mut().get_or_create_ipv4(*source)?.into(),
                     unsafe {
                         extract_ipv4_addr_unchecked(*dest, args.translation_prefix.prefix_len())
                     },
                 )
-                .map(|output| Some(output))?)
+                .map(Some)?)
             },
         ) {
             // Write the packet if we get one back from the handler functions

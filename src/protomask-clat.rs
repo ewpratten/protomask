@@ -110,7 +110,7 @@ pub async fn main() {
                     unsafe { embed_ipv4_addr_unchecked(*source, args.embed_prefix) },
                     unsafe { embed_ipv4_addr_unchecked(*dest, args.embed_prefix) },
                 )
-                .map(|output| Some(output))?)
+                .map(Some)?)
             },
             // IPv6 -> IPv4
             |packet, source, dest| {
@@ -119,7 +119,7 @@ pub async fn main() {
                     unsafe { extract_ipv4_addr_unchecked(*source, args.embed_prefix.prefix_len()) },
                     unsafe { extract_ipv4_addr_unchecked(*dest, args.embed_prefix.prefix_len()) },
                 )
-                .map(|output| Some(output))?)
+                .map(Some)?)
             },
         ) {
             // Write the packet if we get one back from the handler functions

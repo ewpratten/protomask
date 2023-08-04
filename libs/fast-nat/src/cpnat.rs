@@ -93,6 +93,12 @@ impl CrossProtocolNetworkAddressTable {
     pub fn len(&self) -> usize {
         self.addr_map.len()
     }
+
+    /// Check if the table is empty
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.addr_map.is_empty()
+    }
 }
 
 impl Default for CrossProtocolNetworkAddressTable {
@@ -118,7 +124,8 @@ pub struct CrossProtocolNetworkAddressTableWithIpv4Pool {
 
 impl CrossProtocolNetworkAddressTableWithIpv4Pool {
     /// Construct a new Cross-protocol network address table with a given IPv4 pool
-    pub fn new<T: Into<u32> + Clone>(pool: Vec<(T, T)>, timeout: Duration) -> Self {
+    #[must_use]
+    pub fn new<T: Into<u32> + Clone>(pool: &[(T, T)], timeout: Duration) -> Self {
         Self {
             table: CrossProtocolNetworkAddressTable::default(),
             pool: pool

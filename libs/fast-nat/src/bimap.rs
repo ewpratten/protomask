@@ -63,6 +63,11 @@ where
     pub fn len(&self) -> usize {
         self.left_to_right.len()
     }
+
+    /// Check if the `BiHashMap` is empty
+    pub fn is_empty(&self) -> bool {
+        self.left_to_right.is_empty()
+    }
 }
 
 impl<Left, Right> Default for BiHashMap<Left, Right> {

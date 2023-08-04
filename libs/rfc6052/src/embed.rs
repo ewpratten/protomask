@@ -1,3 +1,5 @@
+//! IPv4 address embedding functions
+
 use ipnet::Ipv6Net;
 use std::cmp::{max, min};
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -6,6 +8,32 @@ use crate::error::Error;
 use crate::ALLOWED_PREFIX_LENS;
 
 /// Embeds an IPv4 address into an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use ipnet::{Ipv6Net};
+/// # use std::net::{Ipv4Addr, Ipv6Addr};
+/// use rfc6052::embed_ipv4_addr;
+/// 
+/// // An IPv4 address can be embedded into an IPv6 prefix of acceptable length
+/// assert_eq!(
+///    embed_ipv4_addr(
+///        "192.0.2.1".parse().unwrap(),
+///        "64:ff9b::/32".parse().unwrap()
+///    ),
+///    Ok("64:ff9b:c000:0201::".parse::<Ipv6Addr>().unwrap())
+/// );
+/// 
+/// // Using a prefix that is not an RFC-approved length (in this case 66) will fail
+/// assert_eq!(
+///    embed_ipv4_addr(
+///        "192.0.2.1".parse().unwrap(),
+///        "64:ff9b::/66".parse().unwrap()
+///    ),
+///    Err(rfc6052::Error::InvalidPrefixLength(66))
+/// );
+/// ```
 pub fn embed_ipv4_addr(ipv4_addr: Ipv4Addr, ipv6_prefix: Ipv6Net) -> Result<Ipv6Addr, Error> {
     // Fail if the prefix length is invalid
     if !ALLOWED_PREFIX_LENS.contains(&ipv6_prefix.prefix_len()) {
@@ -19,6 +47,26 @@ pub fn embed_ipv4_addr(ipv4_addr: Ipv4Addr, ipv6_prefix: Ipv6Net) -> Result<Ipv6
 /// Embeds an IPv4 address into an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
 ///
 /// **Warning:** This function does not check that the prefix length is valid according to the RFC. Use `embed_ipv4_addr` instead.
+/// 
+/// # Examples
+/// 
+/// ```
+/// # use ipnet::{Ipv6Net};
+/// # use std::net::{Ipv4Addr, Ipv6Addr};
+/// use rfc6052::embed_ipv4_addr_unchecked;
+/// 
+/// // Using a prefix that is not an RFC-approved length (in this case 66) will *succeed*
+/// // This is *not* the behavior of `embed_ipv4_addr`
+/// assert_eq!(
+///    unsafe {
+///        embed_ipv4_addr_unchecked(
+///            "192.0.2.1".parse().unwrap(),
+///            "64:ff9b::/66".parse().unwrap()
+///        )
+///    },
+///    "64:ff9b::30:0:8040:0".parse::<Ipv6Addr>().unwrap()
+/// );
+/// ```
 #[must_use]
 #[allow(clippy::cast_lossless)]
 #[allow(clippy::cast_possible_truncation)]

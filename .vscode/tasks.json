@@ -28,6 +28,21 @@
 			"label": "rust: cargo test"
 		},
 		{
+			"type": "cargo",
+			"command": "doc",
+			"args": [
+				"--no-deps",
+				"--workspace",
+				"--document-private-items"
+			],
+			"problemMatcher": [
+				"$rustc",
+				"$rust-panic"
+			],
+			"group": "build",
+			"label": "rust: cargo doc"
+		},
+		{
 			"type": "shell",
 			"command": "zola",
 			"args": [

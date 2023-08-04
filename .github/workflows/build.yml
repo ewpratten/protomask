@@ -85,6 +85,7 @@ jobs:
         with:
           body: |
             ## Binary sizes for `${{ matrix.target }}`
+            **Channel:** `${{ matrix.rust_channel }}`
             
             ```
             ${{ steps.get-bin-size-info.outputs.body }}

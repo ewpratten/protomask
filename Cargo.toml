@@ -90,9 +90,14 @@ assets = [
         "755",
     ],
     [
-        "./protomask.toml",
-        "/etc/protomask.toml",
-        "644",
+        "target/release/protomask-clat",
+        "/usr/local/bin/protomask-clat",
+        "755",
+    ],
+    [
+        "target/release/protomask-6over4",
+        "/usr/local/bin/protomask-6over4",
+        "755",
     ],
     [
         "README.md",
@@ -100,7 +105,7 @@ assets = [
         "644",
     ],
 ]
-conf-files = ["/etc/protomask.toml"]
+conf-files = []
 depends = []
 maintainer-scripts = "./debian/"
 systemd-units = { enable = false }

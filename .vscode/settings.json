@@ -11,5 +11,14 @@
         "editor.tabSize": 2,
         "editor.autoIndent": "advanced",
         "diffEditor.ignoreTrimWhitespace": false
+    },
+    "files.associations": {
+        "*.json.liquid": "json",
+        "*.yaml.liquid": "yaml",
+        "*.md.liquid": "markdown",
+        "*.js.liquid": "liquid-javascript",
+        "*.css.liquid": "liquid-css",
+        "*.scss.liquid": "liquid-scss",
+        "docs/website/_redirects": "plaintext"
     }
 }

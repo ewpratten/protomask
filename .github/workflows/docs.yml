@@ -32,17 +32,17 @@ jobs:
       - name: Build Book
         run: mdbook build
 
-      - name: Build Website
-        uses: shalzz/zola-deploy-action@v0.17.2
-        env:
-          BUILD_DIR: ./docs/website
-          BUILD_ONLY: true
+      - name: Build rustdoc
+        uses: actions-rs/cargo@v1
+        with:
+          command: doc
+          args: --no-deps --workspace --document-private-items
 
-      - name: Combine Book and Website
-        run: mkdir -p /tmp/combined && cp -rv docs/website/public/* /tmp/combined && cp -rv target/book/ /tmp/combined/book
+      - name: Combine Book and rustdoc
+        run: mkdir -p /tmp/combined && cp -rv target/book/ /tmp/combined/book && cp -rv target/doc/ /tmp/combined/rustdoc-master
 
       - name: Write CNAME file
-        run: echo "protomask.ewpratten.com" > /tmp/combined/CNAME
+        run: echo "docs.protomask.ewpratten.com" > /tmp/combined/CNAME
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2

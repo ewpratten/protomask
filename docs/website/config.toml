@@ -1,8 +1,0 @@
-base_url = "https://protomask.ewpratten.com"
-compile_sass = true
-build_search_index = true
-
-[markdown]
-highlight_code = true
-
-[extra]

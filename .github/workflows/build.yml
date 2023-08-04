@@ -36,7 +36,7 @@ jobs:
       # Builds targeting aarch64 require `aarch64-linux-gnu-strip`
       - name: Install aarch64-linux-gnu-strip
         if: matrix.target == 'aarch64-unknown-linux-musl'
-        run: sudo apt-get install -y binutils-aarch64-linux-gnu
+        run: sudo apt-get update && sudo apt-get install -y binutils-aarch64-linux-gnu
 
       - name: Install cargo-deb
         uses: actions-rs/cargo@v1
@@ -70,3 +70,22 @@ jobs:
         with:
           name: debian-packages
           path: target/${{ matrix.target }}/debian/*.deb
+
+      - name: Determine binary sizes
+        id: get-bin-size-info
+        run: |
+          body="$(du -h target/${{ matrix.target }}/release/protomask{,-clat,-6over4} | sort -hr)"
+          delimiter="$(openssl rand -hex 8)"
+          echo "body<<$delimiter" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
+
+      - name: Add binary size info to commit
+        uses: peter-evans/commit-comment@v2
+        with:
+          body: |
+            ## Binary sizes for `${{ matrix.target }}`
+            
+            ```
+            ${{ steps.get-bin-size-info.outputs.body }}
+            ```

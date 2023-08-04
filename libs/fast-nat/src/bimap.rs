@@ -58,6 +58,11 @@ where
             self.left_to_right.remove(&left);
         }
     }
+
+    /// Get the total number of mappings in the `BiHashMap`
+    pub fn len(&self) -> usize {
+        self.left_to_right.len()
+    }
 }
 
 impl<Left, Right> Default for BiHashMap<Left, Right> {

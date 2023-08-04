@@ -1,4 +1,3 @@
-
 /// A short-hand way to access one of the metrics in `protomask_metrics::metrics`
 #[macro_export]
 macro_rules! metric {

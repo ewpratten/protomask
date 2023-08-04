@@ -1,13 +1,22 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+#[derive(Debug, thiserror::Error)]
+pub enum PacketHandlingError {
+    #[error(transparent)]
+    InterprotoError(#[from] interproto::error::Error),
+    #[error(transparent)]
+    FastNatError(#[from] fast_nat::error::Error),
+}
+
+/// Handles checking the version number of an IP packet and calling the correct handler with needed data
 pub fn handle_packet<Ipv4Handler, Ipv6Handler>(
     packet: &[u8],
-    ipv4_handler: Ipv4Handler,
-    ipv6_handler: Ipv6Handler,
+    mut ipv4_handler: Ipv4Handler,
+    mut ipv6_handler: Ipv6Handler,
 ) -> Option<Vec<u8>>
 where
-    Ipv4Handler: Fn(&[u8], &Ipv4Addr, &Ipv4Addr) -> Result<Vec<u8>, interproto::error::Error>,
-    Ipv6Handler: Fn(&[u8], &Ipv6Addr, &Ipv6Addr) -> Result<Vec<u8>, interproto::error::Error>,
+    Ipv4Handler: FnMut(&[u8], &Ipv4Addr, &Ipv4Addr) -> Result<Option<Vec<u8>>, PacketHandlingError>,
+    Ipv6Handler: FnMut(&[u8], &Ipv6Addr, &Ipv6Addr) -> Result<Option<Vec<u8>>, PacketHandlingError>,
 {
     // If the packet is empty, return nothing
     if packet.is_empty() {
@@ -52,10 +61,13 @@ where
     // The response from the handler may or may not be a warn-able error
     match handler_response {
         // If we get data, return it
-        Ok(data) => Some(data),
+        Ok(data) => data,
         // If we get an error, handle it and return None
         Err(error) => match error {
-            interproto::error::Error::PacketTooShort { expected, actual } => {
+            PacketHandlingError::InterprotoError(interproto::error::Error::PacketTooShort {
+                expected,
+                actual,
+            }) => {
                 log::warn!(
                     "Got packet with length {} when expecting at least {} bytes",
                     actual,
@@ -63,15 +75,27 @@ where
                 );
                 None
             }
-            interproto::error::Error::UnsupportedIcmpType(icmp_type) => {
+            PacketHandlingError::InterprotoError(
+                interproto::error::Error::UnsupportedIcmpType(icmp_type),
+            ) => {
                 log::warn!("Got a packet with an unsupported ICMP type: {}", icmp_type);
                 None
             }
-            interproto::error::Error::UnsupportedIcmpv6Type(icmpv6_type) => {
+            PacketHandlingError::InterprotoError(
+                interproto::error::Error::UnsupportedIcmpv6Type(icmpv6_type),
+            ) => {
                 log::warn!(
                     "Got a packet with an unsupported ICMPv6 type: {}",
                     icmpv6_type
                 );
+                None
+            }
+            PacketHandlingError::FastNatError(fast_nat::error::Error::Ipv4PoolExhausted(size)) => {
+                log::warn!("IPv4 pool exhausted with {} mappings", size);
+                None
+            }
+            PacketHandlingError::FastNatError(fast_nat::error::Error::InvalidIpv4Address(addr)) => {
+                log::warn!("Invalid IPv4 address: {}", addr);
                 None
             }
         },

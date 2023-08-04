@@ -105,19 +105,21 @@ pub async fn main() {
             &buffer[..len],
             // IPv4 -> IPv6
             |packet, source, dest| {
-                translate_ipv4_to_ipv6(
+                Ok(translate_ipv4_to_ipv6(
                     packet,
                     unsafe { embed_ipv4_addr_unchecked(*source, args.embed_prefix) },
                     unsafe { embed_ipv4_addr_unchecked(*dest, args.embed_prefix) },
                 )
+                .map(|output| Some(output))?)
             },
             // IPv6 -> IPv4
             |packet, source, dest| {
-                translate_ipv6_to_ipv4(
+                Ok(translate_ipv6_to_ipv4(
                     packet,
                     unsafe { extract_ipv4_addr_unchecked(*source, args.embed_prefix.prefix_len()) },
                     unsafe { extract_ipv4_addr_unchecked(*dest, args.embed_prefix.prefix_len()) },
                 )
+                .map(|output| Some(output))?)
             },
         ) {
             // Write the packet if we get one back from the handler functions

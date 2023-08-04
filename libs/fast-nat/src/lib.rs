@@ -6,8 +6,9 @@
 
 mod bimap;
 mod cpnat;
+pub mod error;
 mod nat;
 mod timeout;
 
-pub use cpnat::CrossProtocolNetworkAddressTable;
+pub use cpnat::{CrossProtocolNetworkAddressTable, CrossProtocolNetworkAddressTableWithIpv4Pool};
 pub use nat::NetworkAddressTable;

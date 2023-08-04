@@ -1,15 +1,20 @@
 use clap::Parser;
 use common::{logging::enable_logger, rfc6052::parse_network_specific_prefix};
 use easy_tun::Tun;
-use fast_nat::CrossProtocolNetworkAddressTable;
+use fast_nat::CrossProtocolNetworkAddressTableWithIpv4Pool;
 use interproto::protocols::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use nix::unistd::Uid;
+use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
 use std::{
+    cell::RefCell,
     io::{BufRead, Read, Write},
     net::{Ipv4Addr, Ipv6Addr},
     path::PathBuf,
+    time::Duration,
 };
+
+use crate::common::packet_handler::handle_packet;
 
 mod common;
 
@@ -121,51 +126,69 @@ pub async fn main() {
         .unwrap();
 
     // Add a route for each NAT pool prefix
-    for pool_prefix in args.pool.prefixes().unwrap() {
+    let pool_prefixes = args.pool.prefixes().unwrap();
+    for pool_prefix in &pool_prefixes {
         log::debug!("Adding route for {} to {}", pool_prefix, tun.name());
-        rtnl::route::route_add(IpNet::V4(pool_prefix), &rt_handle, tun_link_idx)
+        rtnl::route::route_add(IpNet::V4(*pool_prefix), &rt_handle, tun_link_idx)
             .await
             .unwrap();
     }
 
     // Set up the address table
-    let mut addr_table = CrossProtocolNetworkAddressTable::default();
+    let mut addr_table = RefCell::new(CrossProtocolNetworkAddressTableWithIpv4Pool::new(
+        pool_prefixes
+            .iter()
+            .map(|prefix| (u32::from(prefix.addr()), prefix.prefix_len() as u32))
+            .collect(),
+        Duration::from_secs(args.reservation_timeout),
+    ));
     for (v6_addr, v4_addr) in args.get_static_reservations().unwrap() {
-        addr_table.insert_indefinite(v4_addr, v6_addr);
+        addr_table
+            .get_mut()
+            .insert_static(v4_addr, v6_addr)
+            .unwrap();
     }
 
     // Translate all incoming packets
     log::info!("Translating packets on {}", tun.name());
     let mut buffer = vec![0u8; 1500];
-    // loop {
-    //     // Read a packet
-    //     let len = tun.read(&mut buffer).unwrap();
+    loop {
+        // Read a packet
+        let len = tun.read(&mut buffer).unwrap();
 
-    //     // Translate it based on the Layer 3 protocol number
-    //     if let Some(output) = handle_packet(
-    //         &buffer[..len],
-    //         // IPv4 -> IPv6
-    //         |packet, source, dest| {
-    //             // translate_ipv4_to_ipv6(
-    //             //     packet,
-    //             //     unsafe { embed_ipv4_addr_unchecked(*source, args.embed_prefix) },
-    //             //     unsafe { embed_ipv4_addr_unchecked(*dest, args.embed_prefix) },
-    //             // )
-    //             todo!()
-    //         },
-    //         // IPv6 -> IPv4
-    //         |packet, source, dest| {
-
-    //             // translate_ipv6_to_ipv4(
-    //             //     packet,
-    //             //     unsafe { extract_ipv4_addr_unchecked(*source, args.embed_prefix.prefix_len()) },
-    //             //     unsafe { extract_ipv4_addr_unchecked(*dest, args.embed_prefix.prefix_len()) },
-    //             // )
-    //             todo!()
-    //         },
-    //     ) {
-    //         // Write the packet if we get one back from the handler functions
-    //         tun.write_all(&output).unwrap();
-    //     }
-    // }
+        // Translate it based on the Layer 3 protocol number
+        if let Some(output) = handle_packet(
+            &buffer[..len],
+            // IPv4 -> IPv6
+            |packet, source, dest| match addr_table.borrow().get_ipv6(*dest) {
+                Some(new_destination) => Ok(translate_ipv4_to_ipv6(
+                    packet,
+                    unsafe { embed_ipv4_addr_unchecked(*source, args.translation_prefix) },
+                    new_destination.into(),
+                )
+                .map(|output| Some(output))?),
+                None => {
+                    protomask_metrics::metric!(PACKET_COUNTER, PROTOCOL_IPV4, STATUS_DROPPED);
+                    Ok(None)
+                }
+            },
+            // IPv6 -> IPv4
+            |packet, source, dest| {
+                Ok(translate_ipv6_to_ipv4(
+                    packet,
+                    addr_table
+                        .borrow_mut()
+                        .get_or_create_ipv4(source.clone())?
+                        .into(),
+                    unsafe {
+                        extract_ipv4_addr_unchecked(*dest, args.translation_prefix.prefix_len())
+                    },
+                )
+                .map(|output| Some(output))?)
+            },
+        ) {
+            // Write the packet if we get one back from the handler functions
+            tun.write_all(&output).unwrap();
+        }
+    }
 }

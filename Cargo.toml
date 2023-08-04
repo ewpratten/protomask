@@ -79,6 +79,7 @@ log = "0.4.19"
 fern = "0.6.2"
 ipnet = "2.8.0"
 nix = "0.26.2"
+thiserror = "1.0.44"
 
 [package.metadata.deb]
 section = "network"

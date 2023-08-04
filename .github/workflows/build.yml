@@ -33,6 +33,11 @@ jobs:
           toolchain: ${{ matrix.rust_channel }}
           override: true
 
+      # Builds targeting aarch64 require `aarch64-linux-gnu-strip`
+      - name: Install aarch64-linux-gnu-strip
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: sudo apt-get install -y binutils-aarch64-linux-gnu
+
       - name: Install cargo-deb
         uses: actions-rs/cargo@v1
         with:

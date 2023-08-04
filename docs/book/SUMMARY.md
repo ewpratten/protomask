@@ -1,3 +1,10 @@
 # Summary
 
-- [Chapter 1](./chapter_1.md)
+- [Introduction](./introduction.md)
+- [Libraries](./libraries.md)
+
+# User Guides
+
+- [Using `protomask`](./binaries/protomask.md)
+- [Using `protomask-clat`](./binaries/protomask-clat.md)
+

@@ -14,3 +14,5 @@ create-missing = true
 
 [output.html]
 mathjax-support = true
+git-repository-url = "https://github.com/ewpratten/protomask"
+site-url = "/book/"

@@ -5,19 +5,19 @@ use std::cmp::max;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 /// Extracts an IPv4 address from an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// # use std::net::{Ipv4Addr, Ipv6Addr};
 /// use rfc6052::extract_ipv4_addr;
-/// 
+///
 /// // An IPv4 address can be extracted from an IPv6 prefix of acceptable length
 /// assert_eq!(
 ///     extract_ipv4_addr_unchecked("64:ff9b:c000:0201::".parse().unwrap(), 32),
 ///     Ok("192.0.2.1".parse::<Ipv4Addr>().unwrap())
 /// );
-/// 
+///
 /// // Using a prefix that is not an RFC-approved length (in this case 66) will fail
 /// assert_eq!(
 ///     extract_ipv4_addr_unchecked("64:ff9b:c000:0201::".parse().unwrap(), 66),
@@ -37,13 +37,13 @@ pub fn extract_ipv4_addr(ipv6_addr: Ipv6Addr, prefix_length: u8) -> Result<Ipv4A
 /// Extracts an IPv4 address from an IPv6 prefix following the method defined in [RFC6052 Section 2.2](https://datatracker.ietf.org/doc/html/rfc6052#section-2.2)
 ///
 /// **Warning:** This function does not check that the prefix length is valid according to the RFC. Use `extract_ipv4_addr` instead.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// # use std::net::{Ipv4Addr, Ipv6Addr};
 /// use rfc6052::extract_ipv4_addr_unchecked;
-/// 
+///
 /// // Using a prefix that is not an RFC-approved length (in this case 66) will *succeed*
 /// // This is *not* the behavior of `extract_ipv4_addr`
 /// assert_eq!(

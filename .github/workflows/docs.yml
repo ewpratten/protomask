@@ -4,14 +4,18 @@ on:
   pull_request:
   push:
     paths:
-        - ".github/workflows/docs.yml"
-        - "docs/**"
-        - "book.toml"
+      - ".github/workflows/docs.yml"
+      - "docs/**"
+      - "book.toml"
 
 jobs:
   build:
     name: Build Docs
     runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v3
@@ -31,4 +35,14 @@ jobs:
           BUILD_ONLY: true
 
       - name: Combine Book and Website
-        run: mkdir -p /tmp/combined && cp -rv docs/website/* /tmp/combined && cp -rv book/ /tmp/combined/book 
+        run: mkdir -p /tmp/combined && cp -rv docs/website/* /tmp/combined && cp -rv target/book/ /tmp/combined/book
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: /tmp/combined
+
+      - name: Deploy
+        uses: actions/deploy-pages@v2
+        id: deployment
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ewpratten/reorg2' }}

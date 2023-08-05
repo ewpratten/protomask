@@ -9,3 +9,15 @@ IPv4 addresses are 32-bit numbers (represented as `xxx.xxx.xxx.xxx`), while IPv6
 
 When an IPv4 packet is sent from one host to another, the sender embeds both the sending and receiving address into the packet header (just like a destination and return address on physical mail). This means that a packet traveling from `192.0.2.1` to `192.0.2.2` would be marked as such in the packet header:
 
+```mermaid
+graph LR
+    HostA((Host A)) -->|src: 192.0.2.1\ndst: 192.0.2.2| HostB((Host B))
+```
+
+And a response to that packet would be marked with the opposite addresses:
+
+```mermaid
+graph RL
+    HostB((Host B)) -->|src: 192.0.2.2\ndst: 192.0.2.1| HostA((Host A))
+```
+

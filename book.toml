@@ -16,3 +16,9 @@ create-missing = true
 mathjax-support = true
 git-repository-url = "https://github.com/ewpratten/protomask"
 site-url = "/book/"
+additional-js = ["docs/book/mermaid/mermaid.min.js", "docs/book/mermaid/mermaid-init.js"]
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

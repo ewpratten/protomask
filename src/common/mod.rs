@@ -2,5 +2,5 @@
 
 pub mod logging;
 pub mod packet_handler;
-pub mod rfc6052;
 pub mod permissions;
+pub mod rfc6052;

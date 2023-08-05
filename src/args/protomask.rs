@@ -90,3 +90,15 @@ pub struct Config {
     #[clap(long, default_value = "7200")]
     pub reservation_timeout: u64,
 }
+
+#[derive(Debug, serde::Deserialize, Clone)]
+pub struct StaticMap {
+    pub ipv4: Ipv4Addr,
+    pub ipv6: Ipv6Addr,
+}
+
+impl Into<(Ipv4Addr, Ipv6Addr)> for StaticMap {
+    fn into(self) -> (Ipv4Addr, Ipv6Addr) {
+        (self.ipv4, self.ipv6)
+    }
+}

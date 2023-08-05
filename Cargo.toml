@@ -102,12 +102,25 @@ assets = [
         "755",
     ],
     [
+        "config/protomask.json",
+        "/etc/protomask/protomask.json",
+        "644",
+    ],
+    [
+        "config/protomask-clat.json",
+        "/etc/protomask/protomask-clat.json",
+        "644",
+    ],
+    [
         "README.md",
-        "usr/share/doc/protomask/README.md",
+        "/usr/share/doc/protomask/README.md",
         "644",
     ],
 ]
 conf-files = []
 depends = []
 maintainer-scripts = "./debian/"
-systemd-units = { enable = false }
+systemd-units = [
+    { unit-name = "protomask-service", enable = false },
+    { unit-name = "protomask-clat-service", enable = false },
+]

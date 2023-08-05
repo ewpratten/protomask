@@ -3,7 +3,7 @@ Description = Protomask
 After = network.target
 
 [Service]
-ExecStart = /usr/local/bin/protomask --pool-file /etc/protomask/pool.txt
+ExecStart = /usr/local/bin/protomask --config /etc/protomask/protomask.json
 
 [Install]
 WantedBy=multi-user.target

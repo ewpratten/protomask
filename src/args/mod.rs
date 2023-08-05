@@ -5,7 +5,6 @@ use cfg_if::cfg_if;
 pub mod protomask;
 pub mod protomask_clat;
 
-
 // Used to trick the build process into including a CLI argument based on a feature flag
 cfg_if! {
     if #[cfg(feature = "profiler")] {

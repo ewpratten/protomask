@@ -8,7 +8,6 @@ pub enum PacketHandlingError {
     FastNatError(#[from] fast_nat::error::Error),
 }
 
-
 /// Get the layer 3 protocol of a packet
 pub fn get_layer_3_proto(packet: &[u8]) -> Option<u8> {
     // If the packet is empty, return nothing

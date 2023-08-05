@@ -107,4 +107,3 @@ impl From<StaticMap> for (Ipv4Addr, Ipv6Addr) {
         (val.ipv4, val.ipv6)
     }
 }
-

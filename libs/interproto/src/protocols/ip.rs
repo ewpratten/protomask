@@ -15,6 +15,7 @@ use pnet::packet::{
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 /// Translates an IPv4 packet into an IPv6 packet. The packet payload will be translated recursively as needed.
+#[profiling::function]
 pub fn translate_ipv4_to_ipv6(
     ipv4_packet: &[u8],
     new_source: Ipv6Addr,
@@ -92,6 +93,7 @@ pub fn translate_ipv4_to_ipv6(
 }
 
 /// Translates an IPv6 packet into an IPv4 packet. The packet payload will be translated recursively as needed.
+#[profiling::function]
 pub fn translate_ipv6_to_ipv4(
     ipv6_packet: &[u8],
     new_source: Ipv4Addr,

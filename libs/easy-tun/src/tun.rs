@@ -111,16 +111,19 @@ impl IntoRawFd for Tun {
 }
 
 impl Read for Tun {
+    #[profiling::function]
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         self.fd.read(buf)
     }
 }
 
 impl Write for Tun {
+    #[profiling::function]
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.fd.write(buf)
     }
 
+    #[profiling::function]
     fn flush(&mut self) -> std::io::Result<()> {
         self.fd.flush()
     }

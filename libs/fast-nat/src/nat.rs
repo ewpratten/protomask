@@ -19,6 +19,7 @@ impl NetworkAddressTable {
     }
 
     /// Prune all old mappings
+    #[profiling::function]
     pub fn prune(&mut self) {
         log::trace!("Pruning old network address mappings");
 
@@ -48,6 +49,7 @@ impl NetworkAddressTable {
     }
 
     /// Insert a new indefinite mapping
+    #[profiling::function]
     pub fn insert_indefinite(&mut self, left: Ipv4Addr, right: Ipv4Addr) {
         self.prune();
         let (left, right) = (left.into(), right.into());
@@ -56,6 +58,7 @@ impl NetworkAddressTable {
     }
 
     /// Insert a new mapping with a finite time-to-live
+    #[profiling::function]
     pub fn insert(&mut self, left: Ipv4Addr, right: Ipv4Addr, duration: Duration) {
         self.prune();
         let (left, right) = (left.into(), right.into());
@@ -71,6 +74,7 @@ impl NetworkAddressTable {
 
     /// Get the right value for a given left value
     #[must_use]
+    #[profiling::function]
     pub fn get_right(&self, left: &Ipv4Addr) -> Option<Ipv4Addr> {
         self.addr_map
             .get_right(&(*left).into())
@@ -79,6 +83,7 @@ impl NetworkAddressTable {
 
     /// Get the left value for a given right value
     #[must_use]
+    #[profiling::function]
     pub fn get_left(&self, right: &Ipv4Addr) -> Option<Ipv4Addr> {
         self.addr_map
             .get_left(&(*right).into())

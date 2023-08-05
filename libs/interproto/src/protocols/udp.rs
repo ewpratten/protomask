@@ -5,6 +5,7 @@ use pnet::packet::udp::{self, MutableUdpPacket, UdpPacket};
 use crate::error::{Error, Result};
 
 /// Re-calculates a UDP packet's checksum with a new IPv6 pseudo-header.
+#[profiling::function]
 pub fn recalculate_udp_checksum_ipv6(
     udp_packet: &[u8],
     new_source: Ipv6Addr,
@@ -48,6 +49,7 @@ pub fn recalculate_udp_checksum_ipv6(
 }
 
 /// Re-calculates a UDP packet's checksum with a new IPv4 pseudo-header.
+#[profiling::function]
 pub fn recalculate_udp_checksum_ipv4(
     udp_packet: &[u8],
     new_source: Ipv4Addr,

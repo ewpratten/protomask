@@ -25,6 +25,7 @@ impl CrossProtocolNetworkAddressTable {
     }
 
     /// Prune all old mappings
+    #[profiling::function]
     pub fn prune(&mut self) {
         log::trace!("Pruning old network address mappings");
 
@@ -54,6 +55,7 @@ impl CrossProtocolNetworkAddressTable {
     }
 
     /// Insert a new indefinite mapping
+    #[profiling::function]
     pub fn insert_indefinite(&mut self, ipv4: Ipv4Addr, ipv6: Ipv6Addr) {
         self.prune();
         let (ipv4, ipv6) = (ipv4.into(), ipv6.into());
@@ -62,6 +64,7 @@ impl CrossProtocolNetworkAddressTable {
     }
 
     /// Insert a new mapping with a finite time-to-live
+    #[profiling::function]
     pub fn insert(&mut self, ipv4: Ipv4Addr, ipv6: Ipv6Addr, duration: Duration) {
         self.prune();
         let (ipv4, ipv6) = (ipv4.into(), ipv6.into());
@@ -77,6 +80,7 @@ impl CrossProtocolNetworkAddressTable {
 
     /// Get the IPv6 address for a given IPv4 address
     #[must_use]
+    #[profiling::function]
     pub fn get_ipv6(&self, ipv4: &Ipv4Addr) -> Option<Ipv6Addr> {
         self.addr_map
             .get_right(&(*ipv4).into())
@@ -85,6 +89,7 @@ impl CrossProtocolNetworkAddressTable {
 
     /// Get the IPv4 address for a given IPv6 address
     #[must_use]
+    #[profiling::function]
     pub fn get_ipv4(&self, ipv6: &Ipv6Addr) -> Option<Ipv4Addr> {
         self.addr_map
             .get_left(&(*ipv6).into())
@@ -93,12 +98,14 @@ impl CrossProtocolNetworkAddressTable {
 
     /// Get the number of mappings in the table
     #[must_use]
+    #[profiling::function]
     pub fn len(&self) -> usize {
         self.addr_map.len()
     }
 
     /// Check if the table is empty
     #[must_use]
+    #[profiling::function]
     pub fn is_empty(&self) -> bool {
         self.addr_map.is_empty()
     }
@@ -135,6 +142,7 @@ impl CrossProtocolNetworkAddressTableWithIpv4Pool {
     }
 
     /// Insert a new static mapping
+    #[profiling::function]
     pub fn insert_static(&mut self, ipv4: Ipv4Addr, ipv6: Ipv6Addr) -> Result<(), Error> {
         if !self.pool.iter().any(|prefix| prefix.contains(&ipv4)) {
             return Err(Error::InvalidIpv4Address(ipv4));
@@ -144,6 +152,7 @@ impl CrossProtocolNetworkAddressTableWithIpv4Pool {
     }
 
     /// Gets the IPv4 address for a given IPv6 address or inserts a new mapping if one does not exist (if possible)
+    #[profiling::function]
     pub fn get_or_create_ipv4(&mut self, ipv6: &Ipv6Addr) -> Result<Ipv4Addr, Error> {
         // Return the known mapping if it exists
         if let Some(ipv4) = self.table.get_ipv4(ipv6) {
@@ -172,6 +181,7 @@ impl CrossProtocolNetworkAddressTableWithIpv4Pool {
 
     /// Gets the IPv6 address for a given IPv4 address if it exists
     #[must_use]
+    #[profiling::function]
     pub fn get_ipv6(&self, ipv4: &Ipv4Addr) -> Option<Ipv6Addr> {
         self.table.get_ipv6(ipv4)
     }

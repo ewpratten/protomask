@@ -22,29 +22,33 @@ where
     }
 
     /// Insert a new mapping into the `BiHashMap`
+    #[profiling::function]
     pub fn insert(&mut self, left: Left, right: Right) {
         self.left_to_right.insert(left.clone(), right.clone());
         self.right_to_left.insert(right, left);
     }
 
     /// Get the right value for a given left value
+    #[profiling::function]
     pub fn get_right(&self, left: &Left) -> Option<&Right> {
         self.left_to_right.get(left)
     }
 
     /// Get the left value for a given right value
+    #[profiling::function]
     pub fn get_left(&self, right: &Right) -> Option<&Left> {
         self.right_to_left.get(right)
     }
 
     /// Remove a mapping from the `BiHashMap`
+    #[profiling::function]
     pub fn remove(&mut self, left: &Left, right: &Right) {
         self.left_to_right.remove(left);
         self.right_to_left.remove(right);
     }
 
     /// Remove a mapping from the `BiHashMap` by left value
-    #[allow(dead_code)]
+    #[profiling::function]
     pub fn remove_left(&mut self, left: &Left) {
         if let Some(right) = self.left_to_right.remove(left) {
             self.right_to_left.remove(&right);
@@ -52,7 +56,7 @@ where
     }
 
     /// Remove a mapping from the `BiHashMap` by right value
-    #[allow(dead_code)]
+    #[profiling::function]
     pub fn remove_right(&mut self, right: &Right) {
         if let Some(left) = self.right_to_left.remove(right) {
             self.left_to_right.remove(&left);
@@ -60,11 +64,13 @@ where
     }
 
     /// Get the total number of mappings in the `BiHashMap`
+    #[profiling::function]
     pub fn len(&self) -> usize {
         self.left_to_right.len()
     }
 
     /// Check if the `BiHashMap` is empty
+    #[profiling::function]
     pub fn is_empty(&self) -> bool {
         self.left_to_right.is_empty()
     }

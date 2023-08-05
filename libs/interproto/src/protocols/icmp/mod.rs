@@ -15,6 +15,7 @@ mod type_code;
 
 /// Translate an ICMP packet to ICMPv6. This will make a best guess at the ICMPv6 type and code since there is no 1:1 mapping.
 #[allow(clippy::deprecated_cfg_attr)]
+#[profiling::function]
 pub fn translate_icmp_to_icmpv6(
     icmp_packet: &[u8],
     new_source: Ipv6Addr,
@@ -101,6 +102,7 @@ pub fn translate_icmp_to_icmpv6(
 }
 
 /// Translate an ICMPv6 packet to ICMP. This will make a best guess at the ICMP type and code since there is no 1:1 mapping.
+#[profiling::function]
 pub fn translate_icmpv6_to_icmp(
     icmpv6_packet: &[u8],
     new_source: Ipv4Addr,

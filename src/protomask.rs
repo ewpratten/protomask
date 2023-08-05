@@ -1,4 +1,11 @@
-use crate::common::{packet_handler::handle_packet, permissions::ensure_root};
+use crate::common::{
+    packet_handler::{
+        get_ipv4_src_dst, get_ipv6_src_dst, get_layer_3_proto, handle_translation_error,
+        PacketHandlingError,
+    },
+    permissions::ensure_root,
+    profiler::start_puffin_server,
+};
 use clap::Parser;
 use common::logging::enable_logger;
 use easy_tun::Tun;
@@ -28,6 +35,10 @@ pub async fn main() {
 
     // We must be root to continue program execution
     ensure_root();
+
+    // Start profiling
+    #[allow(clippy::let_unit_value)]
+    let _server = start_puffin_server(&args.profiler_args);
 
     // Bring up a TUN interface
     log::debug!("Creating new TUN interface");
@@ -88,38 +99,71 @@ pub async fn main() {
     log::info!("Translating packets on {}", tun.name());
     let mut buffer = vec![0u8; 1500];
     loop {
+        // Indicate to the profiler that we are starting a new packet
+        profiling::finish_frame!();
+        profiling::scope!("packet");
+
         // Read a packet
         let len = tun.read(&mut buffer).unwrap();
 
         // Translate it based on the Layer 3 protocol number
-        if let Some(output) = handle_packet(
-            &buffer[..len],
-            // IPv4 -> IPv6
-            |packet, source, dest| match addr_table.borrow().get_ipv6(dest) {
-                Some(new_destination) => Ok(translate_ipv4_to_ipv6(
-                    packet,
-                    unsafe { embed_ipv4_addr_unchecked(*source, config.translation_prefix) },
-                    new_destination,
-                )
-                .map(Some)?),
-                None => {
-                    protomask_metrics::metric!(PACKET_COUNTER, PROTOCOL_IPV4, STATUS_DROPPED);
-                    Ok(None)
+        let translation_result: Result<Option<Vec<u8>>, PacketHandlingError> =
+            match get_layer_3_proto(&buffer[..len]) {
+                Some(4) => {
+                    let (source, dest) = get_ipv4_src_dst(&buffer[..len]);
+                    match addr_table.borrow().get_ipv6(&dest) {
+                        Some(new_destination) => translate_ipv4_to_ipv6(
+                            &buffer[..len],
+                            unsafe { embed_ipv4_addr_unchecked(source, config.translation_prefix) },
+                            new_destination,
+                        )
+                        .map(Some)
+                        .map_err(PacketHandlingError::from),
+                        None => {
+                            protomask_metrics::metric!(
+                                PACKET_COUNTER,
+                                PROTOCOL_IPV4,
+                                STATUS_DROPPED
+                            );
+                            Ok(None)
+                        }
+                    }
                 }
-            },
-            // IPv6 -> IPv4
-            |packet, source, dest| {
-                Ok(translate_ipv6_to_ipv4(
-                    packet,
-                    addr_table.borrow_mut().get_or_create_ipv4(source)?,
-                    unsafe {
-                        extract_ipv4_addr_unchecked(*dest, config.translation_prefix.prefix_len())
-                    },
-                )
-                .map(Some)?)
-            },
-        ) {
-            // Write the packet if we get one back from the handler functions
+                Some(6) => {
+                    let (source, dest) = get_ipv6_src_dst(&buffer[..len]);
+                    match addr_table.borrow_mut().get_or_create_ipv4(&source) {
+                        Ok(new_source) => {
+                            translate_ipv6_to_ipv4(&buffer[..len], new_source, unsafe {
+                                extract_ipv4_addr_unchecked(
+                                    dest,
+                                    config.translation_prefix.prefix_len(),
+                                )
+                            })
+                            .map(Some)
+                            .map_err(PacketHandlingError::from)
+                        }
+                        Err(error) => {
+                            log::error!("Error getting IPv4 address: {}", error);
+                            protomask_metrics::metric!(
+                                PACKET_COUNTER,
+                                PROTOCOL_IPV6,
+                                STATUS_DROPPED
+                            );
+                            Ok(None)
+                        }
+                    }
+                }
+                Some(proto) => {
+                    log::warn!("Unknown Layer 3 protocol: {}", proto);
+                    continue;
+                }
+                None => {
+                    continue;
+                }
+            };
+
+        // Handle any errors and write
+        if let Some(output) = handle_translation_error(translation_result) {
             tun.write_all(&output).unwrap();
         }
     }

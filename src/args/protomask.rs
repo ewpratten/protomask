@@ -7,6 +7,8 @@ use ipnet::{Ipv4Net, Ipv6Net};
 
 use crate::common::rfc6052::parse_network_specific_prefix;
 
+use super::ProfilerArgs;
+
 #[derive(clap::Parser)]
 #[clap(author, version, about="Fast and simple NAT64", long_about = None)]
 pub struct Args {
@@ -20,6 +22,9 @@ pub struct Args {
     /// Explicitly set the interface name to use
     #[clap(short, long, default_value_t = ("nat%d").to_string())]
     pub interface: String,
+
+    #[command(flatten)]
+    pub profiler_args: ProfilerArgs,
 
     /// Enable verbose logging
     #[clap(short, long)]
@@ -102,3 +107,4 @@ impl From<StaticMap> for (Ipv4Addr, Ipv6Addr) {
         (val.ipv4, val.ipv6)
     }
 }
+

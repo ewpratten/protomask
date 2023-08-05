@@ -3,7 +3,11 @@
 //! This binary is a Customer-side transLATor (CLAT) that translates all native
 //! IPv4 traffic to IPv6 traffic for transmission over an IPv6-only ISP network.
 
-use crate::common::packet_handler::handle_packet;
+use crate::common::packet_handler::{
+    get_ipv4_src_dst, get_ipv6_src_dst, get_layer_3_proto, handle_translation_error,
+    PacketHandlingError,
+};
+use crate::common::profiler::start_puffin_server;
 use crate::{args::protomask_clat::Args, common::permissions::ensure_root};
 use clap::Parser;
 use common::logging::enable_logger;
@@ -29,6 +33,10 @@ pub async fn main() {
 
     // We must be root to continue program execution
     ensure_root();
+
+    // Start profiling
+    #[allow(clippy::let_unit_value)]
+    let _server = start_puffin_server(&args.profiler_args);
 
     // Bring up a TUN interface
     let mut tun = Tun::new(&args.interface).unwrap();
@@ -81,34 +89,51 @@ pub async fn main() {
     log::info!("Translating packets on {}", tun.name());
     let mut buffer = vec![0u8; 1500];
     loop {
+        // Indicate to the profiler that we are starting a new packet
+        profiling::finish_frame!();
+        profiling::scope!("packet");
+
         // Read a packet
         let len = tun.read(&mut buffer).unwrap();
 
         // Translate it based on the Layer 3 protocol number
-        if let Some(output) = handle_packet(
-            &buffer[..len],
-            // IPv4 -> IPv6
-            |packet, source, dest| {
-                Ok(translate_ipv4_to_ipv6(
-                    packet,
-                    unsafe { embed_ipv4_addr_unchecked(*source, config.embed_prefix) },
-                    unsafe { embed_ipv4_addr_unchecked(*dest, config.embed_prefix) },
-                )
-                .map(Some)?)
-            },
-            // IPv6 -> IPv4
-            |packet, source, dest| {
-                Ok(translate_ipv6_to_ipv4(
-                    packet,
-                    unsafe {
-                        extract_ipv4_addr_unchecked(*source, config.embed_prefix.prefix_len())
-                    },
-                    unsafe { extract_ipv4_addr_unchecked(*dest, config.embed_prefix.prefix_len()) },
-                )
-                .map(Some)?)
-            },
-        ) {
-            // Write the packet if we get one back from the handler functions
+        let translation_result: Result<Option<Vec<u8>>, PacketHandlingError> =
+            match get_layer_3_proto(&buffer[..len]) {
+                Some(4) => {
+                    let (source, dest) = get_ipv4_src_dst(&buffer[..len]);
+                    translate_ipv4_to_ipv6(
+                        &buffer[..len],
+                        unsafe { embed_ipv4_addr_unchecked(source, config.embed_prefix) },
+                        unsafe { embed_ipv4_addr_unchecked(dest, config.embed_prefix) },
+                    )
+                    .map(Some)
+                    .map_err(PacketHandlingError::from)
+                }
+                Some(6) => {
+                    let (source, dest) = get_ipv6_src_dst(&buffer[..len]);
+                    translate_ipv6_to_ipv4(
+                        &buffer[..len],
+                        unsafe {
+                            extract_ipv4_addr_unchecked(source, config.embed_prefix.prefix_len())
+                        },
+                        unsafe {
+                            extract_ipv4_addr_unchecked(dest, config.embed_prefix.prefix_len())
+                        },
+                    )
+                    .map(Some)
+                    .map_err(PacketHandlingError::from)
+                }
+                Some(proto) => {
+                    log::warn!("Unknown Layer 3 protocol: {}", proto);
+                    continue;
+                }
+                None => {
+                    continue;
+                }
+            };
+
+        // Handle any errors and write
+        if let Some(output) = handle_translation_error(translation_result) {
             tun.write_all(&output).unwrap();
         }
     }

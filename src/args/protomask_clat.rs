@@ -1,5 +1,6 @@
 //! Commandline arguments and config file definitions for `protomask-clat`
 
+use super::ProfilerArgs;
 use crate::common::rfc6052::parse_network_specific_prefix;
 use ipnet::{Ipv4Net, Ipv6Net};
 use std::{net::SocketAddr, path::PathBuf};
@@ -17,6 +18,9 @@ pub struct Args {
     /// Explicitly set the interface name to use
     #[clap(short, long, default_value_t = ("clat%d").to_string())]
     pub interface: String,
+
+    #[command(flatten)]
+    pub profiler_args: ProfilerArgs,
 
     /// Enable verbose logging
     #[clap(short, long)]

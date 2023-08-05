@@ -96,6 +96,12 @@ impl Tun {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    /// Get the underlying file descriptor
+    #[must_use]
+    pub fn fd(&self) -> &File {
+        &self.fd
+    }
 }
 
 impl AsRawFd for Tun {

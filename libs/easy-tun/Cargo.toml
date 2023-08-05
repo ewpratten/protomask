@@ -12,6 +12,10 @@ license = "GPL-3.0"
 keywords = []
 categories = []
 
+[features]
+default = []
+profile-puffin = ["profiling/profile-with-puffin"]
+
 [dependencies]
 log = "^0.4"
 libc = "^0.2"

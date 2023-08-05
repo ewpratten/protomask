@@ -70,6 +70,10 @@ thiserror = "1.0.44"
 cfg-if = "1.0.0"
 profiling = "1.0.9"
 
+[profile.release]
+opt-level = 3
+lto = true
+
 [package.metadata.deb]
 section = "network"
 assets = [

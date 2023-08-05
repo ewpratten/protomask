@@ -1,108 +1,33 @@
+use crate::common::{packet_handler::handle_packet, permissions::ensure_root};
 use clap::Parser;
-use common::{logging::enable_logger, rfc6052::parse_network_specific_prefix};
+use common::logging::enable_logger;
 use easy_tun::Tun;
 use fast_nat::CrossProtocolNetworkAddressTableWithIpv4Pool;
 use interproto::protocols::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
-use ipnet::{IpNet, Ipv4Net, Ipv6Net};
-use nix::unistd::Uid;
+use ipnet::IpNet;
 use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
 use std::{
     cell::RefCell,
-    io::{BufRead, Read, Write},
-    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
-    path::PathBuf,
+    io::{Read, Write},
     time::Duration,
 };
 
-use crate::common::packet_handler::handle_packet;
-
+mod args;
 mod common;
-
-#[derive(Parser)]
-#[clap(author, version, about="Fast and simple NAT64", long_about = None)]
-struct Args {
-    #[command(flatten)]
-    pool: PoolArgs,
-
-    /// A CSV file containing static address mappings from IPv6 to IPv4
-    #[clap(long = "static-file")]
-    static_file: Option<PathBuf>,
-
-    /// Enable prometheus metrics on a given address
-    #[clap(long = "prometheus")]
-    prom_bind_addr: Option<SocketAddr>,
-
-    /// RFC6052 IPv6 translation prefix
-    #[clap(long, default_value_t = ("64:ff9b::/96").parse().unwrap(), value_parser = parse_network_specific_prefix)]
-    translation_prefix: Ipv6Net,
-
-    /// NAT reservation timeout in seconds
-    #[clap(long, default_value = "7200")]
-    reservation_timeout: u64,
-
-    /// Explicitly set the interface name to use
-    #[clap(short, long, default_value_t = ("nat%d").to_string())]
-    interface: String,
-
-    /// Enable verbose logging
-    #[clap(short, long)]
-    verbose: bool,
-}
-
-impl Args {
-    pub fn get_static_reservations(
-        &self,
-    ) -> Result<Vec<(Ipv6Addr, Ipv4Addr)>, Box<dyn std::error::Error>> {
-        log::warn!("Static reservations are not yet implemented");
-        Ok(Vec::new())
-    }
-}
-
-#[derive(clap::Args)]
-#[group(required = true, multiple = false)]
-struct PoolArgs {
-    /// IPv4 prefixes to use as NAT pool address space
-    #[clap(long = "pool-add")]
-    pool_prefixes: Vec<Ipv4Net>,
-
-    /// A file containing newline-delimited IPv4 prefixes to use as NAT pool address space
-    #[clap(long = "pool-file", conflicts_with = "pool_prefixes")]
-    pool_file: Option<PathBuf>,
-}
-
-impl PoolArgs {
-    /// Read all pool prefixes from the chosen source
-    pub fn prefixes(&self) -> Result<Vec<Ipv4Net>, Box<dyn std::error::Error>> {
-        match !self.pool_prefixes.is_empty() {
-            true => Ok(self.pool_prefixes.clone()),
-            false => {
-                let mut prefixes = Vec::new();
-                let file = std::fs::File::open(self.pool_file.as_ref().unwrap())?;
-                let reader = std::io::BufReader::new(file);
-                for line in reader.lines() {
-                    let line = line?;
-                    let prefix = line.parse::<Ipv4Net>()?;
-                    prefixes.push(prefix);
-                }
-                Ok(prefixes)
-            }
-        }
-    }
-}
 
 #[tokio::main]
 pub async fn main() {
     // Parse CLI args
-    let args = Args::parse();
+    let args = args::protomask::Args::parse();
 
     // Initialize logging
     enable_logger(args.verbose);
 
+    // Load config data
+    let config = args.data().unwrap();
+
     // We must be root to continue program execution
-    if !Uid::effective().is_root() {
-        log::error!("This program must be run as root");
-        std::process::exit(1);
-    }
+    ensure_root();
 
     // Bring up a TUN interface
     log::debug!("Creating new TUN interface");
@@ -122,16 +47,19 @@ pub async fn main() {
     // Add a route for the translation prefix
     log::debug!(
         "Adding route for {} to {}",
-        args.translation_prefix,
+        config.translation_prefix,
         tun.name()
     );
-    rtnl::route::route_add(IpNet::V6(args.translation_prefix), &rt_handle, tun_link_idx)
-        .await
-        .unwrap();
+    rtnl::route::route_add(
+        IpNet::V6(config.translation_prefix),
+        &rt_handle,
+        tun_link_idx,
+    )
+    .await
+    .unwrap();
 
     // Add a route for each NAT pool prefix
-    let pool_prefixes = args.pool.prefixes().unwrap();
-    for pool_prefix in &pool_prefixes {
+    for pool_prefix in &config.pool_prefixes {
         log::debug!("Adding route for {} to {}", pool_prefix, tun.name());
         rtnl::route::route_add(IpNet::V4(*pool_prefix), &rt_handle, tun_link_idx)
             .await
@@ -140,18 +68,18 @@ pub async fn main() {
 
     // Set up the address table
     let mut addr_table = RefCell::new(CrossProtocolNetworkAddressTableWithIpv4Pool::new(
-        &pool_prefixes,
-        Duration::from_secs(args.reservation_timeout),
+        &config.pool_prefixes,
+        Duration::from_secs(config.reservation_timeout),
     ));
-    for (v6_addr, v4_addr) in args.get_static_reservations().unwrap() {
+    for (v4_addr, v6_addr) in &config.static_map {
         addr_table
             .get_mut()
-            .insert_static(v4_addr, v6_addr)
+            .insert_static(*v4_addr, *v6_addr)
             .unwrap();
     }
 
     // If we are configured to serve prometheus metrics, start the server
-    if let Some(bind_addr) = args.prom_bind_addr {
+    if let Some(bind_addr) = config.prom_bind_addr {
         log::info!("Starting prometheus server on {}", bind_addr);
         tokio::spawn(protomask_metrics::http::serve_metrics(bind_addr));
     }
@@ -170,7 +98,7 @@ pub async fn main() {
             |packet, source, dest| match addr_table.borrow().get_ipv6(dest) {
                 Some(new_destination) => Ok(translate_ipv4_to_ipv6(
                     packet,
-                    unsafe { embed_ipv4_addr_unchecked(*source, args.translation_prefix) },
+                    unsafe { embed_ipv4_addr_unchecked(*source, config.translation_prefix) },
                     new_destination,
                 )
                 .map(Some)?),
@@ -185,7 +113,7 @@ pub async fn main() {
                     packet,
                     addr_table.borrow_mut().get_or_create_ipv4(source)?,
                     unsafe {
-                        extract_ipv4_addr_unchecked(*dest, args.translation_prefix.prefix_len())
+                        extract_ipv4_addr_unchecked(*dest, config.translation_prefix.prefix_len())
                     },
                 )
                 .map(Some)?)

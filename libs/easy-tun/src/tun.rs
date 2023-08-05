@@ -36,6 +36,8 @@ impl Tun {
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_lossless)]
     pub fn new(dev: &str) -> Result<Self, std::io::Error> {
+        log::debug!("Creating new TUN device with requested name:{}", dev);
+
         // Get a file descriptor for `/dev/net/tun`
         log::trace!("Opening /dev/net/tun");
         let fd = OpenOptions::new()
@@ -81,6 +83,9 @@ impl Tun {
             .to_str()
             .unwrap()
             .to_string();
+
+        // Log the success
+        log::debug!("Created TUN device: {}", name);
 
         // Build the TUN struct
         Ok(Self { fd, name })

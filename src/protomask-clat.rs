@@ -3,45 +3,18 @@
 //! This binary is a Customer-side transLATor (CLAT) that translates all native
 //! IPv4 traffic to IPv6 traffic for transmission over an IPv6-only ISP network.
 
+use crate::common::packet_handler::handle_packet;
+use crate::{args::protomask_clat::Args, common::permissions::ensure_root};
 use clap::Parser;
-use common::{logging::enable_logger, rfc6052::parse_network_specific_prefix};
+use common::logging::enable_logger;
 use easy_tun::Tun;
 use interproto::protocols::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
-use nix::unistd::Uid;
 use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
-use std::{
-    io::{Read, Write},
-    net::SocketAddr,
-};
+use std::io::{Read, Write};
 
-use crate::common::packet_handler::handle_packet;
-
+mod args;
 mod common;
-
-#[derive(Debug, Parser)]
-#[clap(author, version, about="IPv4 to IPv6 Customer-side transLATor (CLAT)", long_about = None)]
-struct Args {
-    /// One or more customer-side IPv4 prefixes to allow through CLAT
-    #[clap(short = 'c', long = "customer-prefix", required = true)]
-    customer_pool: Vec<Ipv4Net>,
-
-    /// Enable prometheus metrics on a given address
-    #[clap(long = "prometheus")]
-    prom_bind_addr: Option<SocketAddr>,
-
-    /// RFC6052 IPv6 prefix to encapsulate IPv4 packets within
-    #[clap(long="via", default_value_t = ("64:ff9b::/96").parse().unwrap(), value_parser = parse_network_specific_prefix)]
-    embed_prefix: Ipv6Net,
-
-    /// Explicitly set the interface name to use
-    #[clap(short, long, default_value_t = ("clat%d").to_string())]
-    interface: String,
-
-    /// Enable verbose logging
-    #[clap(short, long)]
-    verbose: bool,
-}
 
 #[tokio::main]
 pub async fn main() {
@@ -51,16 +24,14 @@ pub async fn main() {
     // Initialize logging
     enable_logger(args.verbose);
 
+    // Load config data
+    let config = args.data().unwrap();
+
     // We must be root to continue program execution
-    if !Uid::effective().is_root() {
-        log::error!("This program must be run as root");
-        std::process::exit(1);
-    }
+    ensure_root();
 
     // Bring up a TUN interface
-    log::debug!("Creating new TUN interface");
     let mut tun = Tun::new(&args.interface).unwrap();
-    log::debug!("Created TUN interface: {}", tun.name());
 
     // Get the interface index
     let rt_handle = rtnl::new_handle().unwrap();
@@ -78,11 +49,11 @@ pub async fn main() {
         .unwrap();
 
     // Add an IPv6 route for each customer prefix
-    for customer_prefix in args.customer_pool {
+    for customer_prefix in config.customer_pool {
         let embedded_customer_prefix = unsafe {
             Ipv6Net::new(
-                embed_ipv4_addr_unchecked(customer_prefix.addr(), args.embed_prefix),
-                args.embed_prefix.prefix_len() + customer_prefix.prefix_len(),
+                embed_ipv4_addr_unchecked(customer_prefix.addr(), config.embed_prefix),
+                config.embed_prefix.prefix_len() + customer_prefix.prefix_len(),
             )
             .unwrap_unchecked()
         };
@@ -101,7 +72,7 @@ pub async fn main() {
     }
 
     // If we are configured to serve prometheus metrics, start the server
-    if let Some(bind_addr) = args.prom_bind_addr {
+    if let Some(bind_addr) = config.prom_bind_addr {
         log::info!("Starting prometheus server on {}", bind_addr);
         tokio::spawn(protomask_metrics::http::serve_metrics(bind_addr));
     }
@@ -120,8 +91,8 @@ pub async fn main() {
             |packet, source, dest| {
                 Ok(translate_ipv4_to_ipv6(
                     packet,
-                    unsafe { embed_ipv4_addr_unchecked(*source, args.embed_prefix) },
-                    unsafe { embed_ipv4_addr_unchecked(*dest, args.embed_prefix) },
+                    unsafe { embed_ipv4_addr_unchecked(*source, config.embed_prefix) },
+                    unsafe { embed_ipv4_addr_unchecked(*dest, config.embed_prefix) },
                 )
                 .map(Some)?)
             },
@@ -129,8 +100,10 @@ pub async fn main() {
             |packet, source, dest| {
                 Ok(translate_ipv6_to_ipv4(
                     packet,
-                    unsafe { extract_ipv4_addr_unchecked(*source, args.embed_prefix.prefix_len()) },
-                    unsafe { extract_ipv4_addr_unchecked(*dest, args.embed_prefix.prefix_len()) },
+                    unsafe {
+                        extract_ipv4_addr_unchecked(*source, config.embed_prefix.prefix_len())
+                    },
+                    unsafe { extract_ipv4_addr_unchecked(*dest, config.embed_prefix.prefix_len()) },
                 )
                 .map(Some)?)
             },

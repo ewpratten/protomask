@@ -97,8 +97,8 @@ pub struct StaticMap {
     pub ipv6: Ipv6Addr,
 }
 
-impl Into<(Ipv4Addr, Ipv6Addr)> for StaticMap {
-    fn into(self) -> (Ipv4Addr, Ipv6Addr) {
-        (self.ipv4, self.ipv6)
+impl From<StaticMap> for (Ipv4Addr, Ipv6Addr) {
+    fn from(val: StaticMap) -> Self {
+        (val.ipv4, val.ipv6)
     }
 }

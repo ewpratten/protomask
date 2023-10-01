@@ -1,0 +1,27 @@
+[package]
+name = "easy-tun"
+version = "0.1.0"
+authors = ["Evan Pratten <ewpratten@gmail.com>"]
+edition = "2021"
+description = "A pure-rust TUN interface library"
+readme = "README.md"
+homepage = "https://github.com/ewpratten/protomask/tree/master/libs/easy-tun"
+documentation = "https://docs.rs/easy-tun"
+repository = "https://github.com/ewpratten/protomask"
+license = "GPL-3.0"
+keywords = []
+categories = []
+
+[features]
+default = []
+profile-puffin = ["profiling/profile-with-puffin"]
+
+[dependencies]
+log = "^0.4"
+libc = "^0.2"
+ioctl-gen = "^0.1.1"
+rtnetlink = "^0.13.0"
+profiling = "1.0.9"
+
+[dev-dependencies]
+env_logger = "0.10.0"

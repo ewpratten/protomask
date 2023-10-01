@@ -1,0 +1,21 @@
+[package]
+name = "rtnl"
+version = "0.1.0"
+authors = ["Evan Pratten <ewpratten@gmail.com>"]
+edition = "2021"
+description = "Slightly sane wrapper around rtnetlink"
+readme = "README.md"
+homepage = "https://github.com/ewpratten/protomask/tree/master/libs/rtnl"
+documentation = "https://docs.rs/rtnl"
+repository = "https://github.com/ewpratten/protomask"
+license = "GPL-3.0"
+keywords = []
+categories = []
+
+
+[dependencies]
+tokio = { version = "1.29.1", optional = true, features = ["rt-multi-thread"] }
+log = "0.4.19"
+rtnetlink = "0.13.1"
+futures = "0.3.28"
+ipnet = "^2.8.0"

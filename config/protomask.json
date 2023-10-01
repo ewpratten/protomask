@@ -1,0 +1,14 @@
+{
+    "prefix": "64:ff9b::/96",
+    "pool": [
+        "192.0.2.0/24"
+    ],
+    "static_map": [
+        {
+            "ipv4": "192.0.2.1",
+            "ipv6": "2001:db8::1"
+        }
+    ],
+    "prometheus_bind_addr": "[::1]:8999",
+    "reservation_timeout": 7200
+}

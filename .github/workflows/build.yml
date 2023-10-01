@@ -3,30 +3,90 @@ name: Build
 on:
   pull_request:
   push:
-    paths: 
-      - '.github/workflows/build.yml'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - '**/src/*'
+    paths:
+      - ".github/workflows/build.yml"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - "**/src/*"
 
 jobs:
   build_and_test:
-    name: Rust project
+    name: Build & Test
+
+    # Use a build matrix to run this job targeting all supported platforms
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # All supported targets
+        target:
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-musl
+        # All supported Rust channels
+        rust_channel:
+          - stable
+
+    # Common build steps
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ matrix.rust_channel }}
+          override: true
+
+      # Builds targeting aarch64 require `aarch64-linux-gnu-strip`
+      - name: Install aarch64-linux-gnu-strip
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y binutils-aarch64-linux-gnu
+
+      - name: Install cargo-deb
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-deb
 
       - name: Compile
         uses: actions-rs/cargo@v1
         with:
+          use-cross: true
           command: build
-          args: --release
+          args: --release --target ${{ matrix.target }}
 
       - name: Run Tests
         uses: actions-rs/cargo@v1
         with:
+          use-cross: true
           command: test
-          args: --release
+          args: --all --release --target ${{ matrix.target }}
+      
+      - name: Package DEB
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: deb
+          args: --target ${{ matrix.target }} --no-build
+
+      - name: Upload DEB
+        uses: actions/upload-artifact@v3
+        with:
+          name: debian-packages
+          path: target/${{ matrix.target }}/debian/*.deb
+
+      - name: Determine binary sizes
+        id: get-bin-size-info
+        run: |
+          body="$(du -h target/${{ matrix.target }}/release/protomask{,-clat,-6over4} | sort -hr)"
+          delimiter="$(openssl rand -hex 8)"
+          echo "body<<$delimiter" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
+
+      - name: Add binary size info to commit
+        uses: peter-evans/commit-comment@v2
+        with:
+          body: |
+            ## Binary sizes for `${{ matrix.target }}`
+            **Channel:** `${{ matrix.rust_channel }}`
+            
+            ```
+            ${{ steps.get-bin-size-info.outputs.body }}
+            ```

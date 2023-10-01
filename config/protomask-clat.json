@@ -1,0 +1,7 @@
+{
+    "via": "64:ff9b::/96",
+    "customer_pool": [
+        "192.0.2.0/24"
+    ],
+    "prometheus_bind_addr": "[::1]:8999"
+}

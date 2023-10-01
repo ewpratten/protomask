@@ -41,16 +41,6 @@
 			],
 			"group": "build",
 			"label": "rust: cargo doc"
-		},
-		{
-			"type": "shell",
-			"command": "zola",
-			"args": [
-				"-r",
-				"docs/website",
-				"serve"
-			],
-			"label": "zola: serve website"
 		}
 	]
 }

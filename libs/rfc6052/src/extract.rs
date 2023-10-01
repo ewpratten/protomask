@@ -14,13 +14,13 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 ///
 /// // An IPv4 address can be extracted from an IPv6 prefix of acceptable length
 /// assert_eq!(
-///     extract_ipv4_addr_unchecked("64:ff9b:c000:0201::".parse().unwrap(), 32),
+///     extract_ipv4_addr("64:ff9b:c000:0201::".parse().unwrap(), 32),
 ///     Ok("192.0.2.1".parse::<Ipv4Addr>().unwrap())
 /// );
 ///
 /// // Using a prefix that is not an RFC-approved length (in this case 66) will fail
 /// assert_eq!(
-///     extract_ipv4_addr_unchecked("64:ff9b:c000:0201::".parse().unwrap(), 66),
+///     extract_ipv4_addr("64:ff9b:c000:0201::".parse().unwrap(), 66),
 ///     Err(rfc6052::Error::InvalidPrefixLength(66))
 /// );
 /// ```

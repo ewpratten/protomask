@@ -81,7 +81,7 @@ Then, install with:
 ```sh
 apt install /path/to/protomask_<version>_<arch>.deb
 
-# You can also edit the config file in /etc/protomask.toml
+# You can also edit the config file in /etc/protomask.json
 # And once ready, start protomask with
 systemctl start protomask
 ```
@@ -91,3 +91,32 @@ systemctl start protomask
 ```bash
 cargo install protomask
 ```
+
+## Usage
+
+The `protomask` and `protomask-clat` binaries are mostly self-sufficient.
+
+### Nat64
+
+To start up a NAT64 server on the Well-Known Prefix (WKP), run:
+
+```bash
+protomask --pool-prefix <prefix>
+```
+
+Where `<prefix>` is some block of addresses that are routed to the machine running protomask.
+
+For more information, run `protomask --help`. Configuration may also be supplied via a JSON file. See the [example config](./config/protomask.json) for more information.
+
+
+### CLAT
+
+To start up a CLAT server on the Well-Known Prefix (WKP), run:
+
+```bash
+protomask-clat --customer-prefix <prefix>
+```
+
+Where `<prefix>` is some block of addresses that are routed to the machine running protomask. This would generally be the address range of a home network when run on CPE. It may also be an individual client address if run on a client device instead of a router.
+
+For more information, run `protomask-clat --help`. Configuration may also be supplied via a JSON file. See the [example config](./config/protomask-clat.json) for more information.

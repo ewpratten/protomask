@@ -1,1 +1,0 @@
-# `protomask-clat` User Guide

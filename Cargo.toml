@@ -26,7 +26,7 @@ serde = { version = "1.0.171", features = ["derive"] }
 ipnet = { version = "2.8.0", features = ["serde"] }
 hyper = { version = "0.14.27", features = ["server", "http1", "tcp"] }
 owo-colors = { version = "3.5.0", features = ["supports-colors"] }
-toml = "0.7.6"
+toml = "0.8.3"
 log = "0.4.19"
 fern = "0.6.2"
 serde_path_to_error = "0.1.13"

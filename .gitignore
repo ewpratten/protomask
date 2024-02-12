@@ -19,4 +19,4 @@ Cargo.lock
 #Cargo.lock
 
 # Built packages
-/tars
+/release

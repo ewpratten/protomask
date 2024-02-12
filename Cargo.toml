@@ -90,11 +90,6 @@ assets = [
         "755",
     ],
     [
-        "target/release/protomask-6over4",
-        "/usr/local/bin/protomask-6over4",
-        "755",
-    ],
-    [
         "config/protomask.json",
         "/etc/protomask/protomask.json",
         "644",
@@ -116,4 +111,13 @@ maintainer-scripts = "./debian/"
 systemd-units = [
     { unit-name = "protomask-service", enable = false },
     { unit-name = "protomask-clat-service", enable = false },
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/protomask", dest = "/usr/local/bin/protomask", mode = "755"},
+    { source = "target/release/protomask-clat", dest = "/usr/local/bin/protomask-clat", mode = "755"},
+    { source = "config/protomask.json", dest = "/etc/protomask/protomask.json", mode = "644"},
+    { source = "config/protomask-clat.json", dest = "/etc/protomask/protomask-clat.json", mode = "644"},
+    { source = "README.md", dest = "/usr/share/doc/protomask/README.md", mode = "644"},
 ]

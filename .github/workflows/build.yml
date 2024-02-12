@@ -44,6 +44,12 @@ jobs:
           command: install
           args: cargo-deb
 
+      - name: Install cargo-generate-rpm
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-generate-rpm
+
       - name: Compile
         uses: actions-rs/cargo@v1
         with:
@@ -65,11 +71,24 @@ jobs:
           command: deb
           args: --target ${{ matrix.target }} --no-build
 
+      - name: Package RPM
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: generate-rpm
+          args: --target ${{ matrix.target }}
+
       - name: Upload DEB
         uses: actions/upload-artifact@v3
         with:
           name: debian-packages
           path: target/${{ matrix.target }}/debian/*.deb
+
+      - name: Upload RPM
+        uses: actions/upload-artifact@v3
+        with:
+          name: rpm-packages
+          path: target/${{ matrix.target }}/generate-rpm/*.rpm
 
       - name: Determine binary sizes
         id: get-bin-size-info

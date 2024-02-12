@@ -18,7 +18,7 @@ metrics = ["protomask-metrics"]
 profile-puffin = ["profiling/profile-with-puffin"]
 
 [dependencies]
-protomask-metrics = { path = "../protomask-metrics", optional = true }
+protomask-metrics = { version = "^0.1.0", path = "../protomask-metrics", optional = true }
 log = "^0.4"
 pnet = "0.34.0"
 thiserror = "^1.0.44"

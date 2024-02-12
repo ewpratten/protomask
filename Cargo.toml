@@ -47,12 +47,14 @@ path = "src/protomask-6over4.rs"
 
 [dependencies]
 # Internal dependencies
-easy-tun = { path = "libs/easy-tun" }
-fast-nat = { path = "libs/fast-nat" }
-interproto = { path = "libs/interproto", features = ["metrics"] }
-rfc6052 = { path = "libs/rfc6052" }
-rtnl = { path = "libs/rtnl", features = ["tokio"] }
-protomask-metrics = { path = "libs/protomask-metrics" }
+easy-tun = { version = "^1.0.0", path = "libs/easy-tun" }
+fast-nat = { version = "^1.0.0", path = "libs/fast-nat" }
+interproto = { version = "^1.0.0", path = "libs/interproto", features = [
+    "metrics",
+] }
+rfc6052 = { version = "^1.0.0", path = "libs/rfc6052" }
+rtnl = { version = "^1.0.0", path = "libs/rtnl", features = ["tokio"] }
+protomask-metrics = { version = "^0.1.0", path = "libs/protomask-metrics" }
 
 # External Dependencies
 tokio = { version = "1.29.1", features = ["macros", "rt-multi-thread"] }

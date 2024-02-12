@@ -16,6 +16,6 @@ categories = []
 [dependencies]
 tokio = { version = "1.29.1", optional = true, features = ["rt-multi-thread"] }
 log = "0.4.19"
-rtnetlink = "0.13.1"
+rtnetlink = "0.14.1"
 futures = "0.3.28"
 ipnet = "^2.8.0"

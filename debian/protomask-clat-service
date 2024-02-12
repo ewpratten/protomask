@@ -1,0 +1,9 @@
+[Unit]
+Description = Protomask CLAT
+After = network.target
+
+[Service]
+ExecStart = /usr/local/bin/protomask-clat --config /etc/protomask/protomask-clat.json
+
+[Install]
+WantedBy=multi-user.target

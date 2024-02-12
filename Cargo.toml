@@ -1,6 +1,6 @@
 [package]
 name = "protomask"
-version = "0.2.0"
+version = "1.0.0"
 authors = ["Evan Pratten <ewpratten@gmail.com>"]
 edition = "2021"
 description = "A user space NAT64 implementation"
@@ -11,46 +11,107 @@ repository = "https://github.com/ewpratten/protomask"
 license = "GPL-3.0"
 keywords = []
 categories = []
+exclude = ["/.github/", "/.vscode/"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[dependencies]
-protomask-tun = { path = "protomask-tun", version = "0.1.0" }
-tokio = { version = "1.29.1", features = [
-    "macros",
-    "rt-multi-thread",
-    # "process",
-    "sync"
-] }
-clap = { version = "4.3.11", features = ["derive"] }
-serde = { version = "1.0.171", features = ["derive"] }
-ipnet = { version = "2.8.0", features = ["serde"] }
-hyper = { version = "0.14.27", features = ["server", "http1", "tcp"] }
-owo-colors = { version = "3.5.0", features = ["supports-colors"] }
-toml = "0.7.6"
-log = "0.4.19"
-fern = "0.6.2"
-serde_path_to_error = "0.1.13"
-thiserror = "1.0.43"
-tun-tap = "0.1.3"
-bimap = "0.6.3"
-pnet_packet = "0.34.0"
-rtnetlink = "0.13.0"
-futures = "0.3.28"
-prometheus = "0.13.3"
-lazy_static = "1.4.0"
+[workspace]
+members = [
+    "libs/easy-tun",
+    "libs/fast-nat",
+    "libs/interproto",
+    "libs/rfc6052",
+    "libs/rtnl",
+    "libs/protomask-metrics",
+]
+
+[features]
+default = []
+profiler = [
+    "puffin",
+    "puffin_http",
+    "easy-tun/profile-puffin",
+    "fast-nat/profile-puffin",
+    "interproto/profile-puffin",
+]
 
 [[bin]]
 name = "protomask"
-path = "src/cli/main.rs"
+path = "src/protomask.rs"
+
+[[bin]]
+name = "protomask-clat"
+path = "src/protomask-clat.rs"
+
+[[bin]]
+name = "protomask-6over4"
+path = "src/protomask-6over4.rs"
+
+[dependencies]
+# Internal dependencies
+easy-tun = { path = "libs/easy-tun" }
+fast-nat = { path = "libs/fast-nat" }
+interproto = { path = "libs/interproto", features = ["metrics"] }
+rfc6052 = { path = "libs/rfc6052" }
+rtnl = { path = "libs/rtnl", features = ["tokio"] }
+protomask-metrics = { path = "libs/protomask-metrics" }
+
+# External Dependencies
+tokio = { version = "1.29.1", features = ["macros", "rt-multi-thread"] }
+owo-colors = { version = "3.5.0", features = ["supports-colors"] }
+clap = { version = "4.3.11", features = ["derive"] }
+ipnet = { version = "2.8.0", features = ["serde"] }
+puffin_http = { version = "0.13.0", optional = true }
+puffin = { version = "0.16.0", optional = true }
+serde = { version = "^1.0", features = ["derive"] }
+serde_json = "^1.0"
+log = "0.4.19"
+fern = "0.6.2"
+nix = "0.26.2"
+thiserror = "1.0.44"
+cfg-if = "1.0.0"
+profiling = "1.0.9"
+
+[profile.release]
+opt-level = 3
+lto = true
 
 [package.metadata.deb]
 section = "network"
 assets = [
-    ["target/release/protomask", "/usr/local/bin/protomask", "755"],
-    ["./protomask.toml", "/etc/protomask.toml", "644"],
-    ["README.md", "usr/share/doc/protomask/README.md", "644"]
+    [
+        "target/release/protomask",
+        "/usr/local/bin/protomask",
+        "755",
+    ],
+    [
+        "target/release/protomask-clat",
+        "/usr/local/bin/protomask-clat",
+        "755",
+    ],
+    [
+        "target/release/protomask-6over4",
+        "/usr/local/bin/protomask-6over4",
+        "755",
+    ],
+    [
+        "config/protomask.json",
+        "/etc/protomask/protomask.json",
+        "644",
+    ],
+    [
+        "config/protomask-clat.json",
+        "/etc/protomask/protomask-clat.json",
+        "644",
+    ],
+    [
+        "README.md",
+        "/usr/share/doc/protomask/README.md",
+        "644",
+    ],
 ]
-conf-files = ["/etc/protomask.toml"]
+conf-files = []
 depends = []
 maintainer-scripts = "./debian/"
-systemd-units = { enable = false }
+systemd-units = [
+    { unit-name = "protomask-service", enable = false },
+    { unit-name = "protomask-clat-service", enable = false },
+]

@@ -4,6 +4,9 @@
 		{
 			"type": "cargo",
 			"command": "build",
+			"args": [
+				"--workspace"
+			],
 			"problemMatcher": [
 				"$rustc",
 				"$rust-panic"
@@ -14,12 +17,30 @@
 		{
 			"type": "cargo",
 			"command": "test",
+			"args": [
+				"--workspace"
+			],
 			"problemMatcher": [
 				"$rustc",
 				"$rust-panic"
 			],
 			"group": "test",
 			"label": "rust: cargo test"
-		} 
+		},
+		{
+			"type": "cargo",
+			"command": "doc",
+			"args": [
+				"--no-deps",
+				"--workspace",
+				"--document-private-items"
+			],
+			"problemMatcher": [
+				"$rustc",
+				"$rust-panic"
+			],
+			"group": "build",
+			"label": "rust: cargo doc"
+		}
 	]
 }

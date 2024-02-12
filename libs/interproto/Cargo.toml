@@ -1,0 +1,32 @@
+[package]
+name = "interproto"
+version = "0.1.0"
+authors = ["Evan Pratten <ewpratten@gmail.com>"]
+edition = "2021"
+description = "Utilities for translating packets between IPv4 and IPv6"
+readme = "README.md"
+homepage = "https://github.com/ewpratten/protomask/tree/master/libs/interproto"
+documentation = "https://docs.rs/interproto"
+repository = "https://github.com/ewpratten/protomask"
+license = "GPL-3.0"
+keywords = []
+categories = []
+
+[features]
+default = []
+metrics = ["protomask-metrics"]
+profile-puffin = ["profiling/profile-with-puffin"]
+
+[dependencies]
+protomask-metrics = { path = "../protomask-metrics", optional = true }
+log = "^0.4"
+pnet = "0.34.0"
+thiserror = "^1.0.44"
+profiling = "1.0.9"
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
+[[bench]]
+name = "benchmarks"
+harness = false

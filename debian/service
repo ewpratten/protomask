@@ -1,9 +1,0 @@
-[Unit]
-Description = Protomask
-After = network.target
-
-[Service]
-ExecStart = /usr/local/bin/protomask /etc/protomask.toml
-
-[Install]
-WantedBy=multi-user.target

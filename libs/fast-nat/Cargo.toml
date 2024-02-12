@@ -1,6 +1,6 @@
 [package]
 name = "fast-nat"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Evan Pratten <ewpratten@gmail.com>"]
 edition = "2021"
 description = "An OSI layer 3 Network Address Table built for speed"

@@ -84,7 +84,7 @@ pub struct Config {
     pub embed_prefix: Ipv6Net,
 
     /// Number of queues to create on the TUN device
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value = "10")]
     #[serde(rename = "queues")]
     pub num_queues: usize,
 }

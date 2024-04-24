@@ -96,7 +96,7 @@ pub struct Config {
     pub reservation_timeout: u64,
 
     /// Number of queues to create on the TUN device
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value = "10")]
     #[serde(rename = "queues")]
     pub num_queues: usize,
 }

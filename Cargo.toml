@@ -47,7 +47,7 @@ path = "src/protomask-6over4.rs"
 
 [dependencies]
 # Internal dependencies
-easy-tun = { version = "^1.0.0", path = "libs/easy-tun" }
+easy-tun = { version = "^2.0.0", path = "libs/easy-tun" }
 fast-nat = { version = "^1.0.0", path = "libs/fast-nat" }
 interproto = { version = "^1.0.0", path = "libs/interproto", features = [
     "metrics",

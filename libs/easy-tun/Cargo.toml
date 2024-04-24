@@ -20,7 +20,7 @@ profile-puffin = ["profiling/profile-with-puffin"]
 log = "^0.4"
 libc = "^0.2"
 ioctl-gen = "^0.1.1"
-rtnetlink = "^0.13.0"
+rtnetlink = "^0.14.1"
 profiling = "1.0.9"
 
 [dev-dependencies]

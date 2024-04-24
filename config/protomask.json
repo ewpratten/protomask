@@ -10,5 +10,6 @@
         }
     ],
     "prometheus_bind_addr": "[::1]:8999",
-    "reservation_timeout": 7200
+    "reservation_timeout": 7200,
+    "queues": 10
 }

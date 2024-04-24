@@ -94,6 +94,11 @@ pub struct Config {
     /// NAT reservation timeout in seconds
     #[clap(long, default_value = "7200")]
     pub reservation_timeout: u64,
+
+    /// Number of queues to create on the TUN device
+    #[clap(long, default_value = "1")]
+    #[serde(rename = "queues")]
+    pub num_queues: usize,
 }
 
 #[derive(Debug, serde::Deserialize, Clone)]

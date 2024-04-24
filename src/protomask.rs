@@ -14,8 +14,8 @@ use interproto::protocols::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 use ipnet::IpNet;
 use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
 use std::{
-    cell::RefCell,
     io::{Read, Write},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -42,7 +42,7 @@ pub async fn main() {
 
     // Bring up a TUN interface
     log::debug!("Creating new TUN interface");
-    let mut tun = Tun::new(&args.interface).unwrap();
+    let tun = Arc::new(Tun::new(&args.interface, config.num_queues).unwrap());
     log::debug!("Created TUN interface: {}", tun.name());
 
     // Get the interface index
@@ -78,13 +78,16 @@ pub async fn main() {
     }
 
     // Set up the address table
-    let mut addr_table = RefCell::new(CrossProtocolNetworkAddressTableWithIpv4Pool::new(
-        &config.pool_prefixes,
-        Duration::from_secs(config.reservation_timeout),
+    let addr_table = Arc::new(Mutex::new(
+        CrossProtocolNetworkAddressTableWithIpv4Pool::new(
+            &config.pool_prefixes,
+            Duration::from_secs(config.reservation_timeout),
+        ),
     ));
     for (v4_addr, v6_addr) in &config.static_map {
         addr_table
-            .get_mut()
+            .lock()
+            .unwrap()
             .insert_static(*v4_addr, *v6_addr)
             .unwrap();
     }
@@ -97,74 +100,88 @@ pub async fn main() {
 
     // Translate all incoming packets
     log::info!("Translating packets on {}", tun.name());
-    let mut buffer = vec![0u8; 1500];
-    loop {
-        // Indicate to the profiler that we are starting a new packet
-        profiling::finish_frame!();
-        profiling::scope!("packet");
+    let mut worker_threads = Vec::new();
+    for queue_id in 0..config.num_queues {
+        let tun = Arc::clone(&tun);
+        let addr_table = Arc::clone(&addr_table);
+        worker_threads.push(std::thread::spawn(move || {
+            log::debug!("Starting worker thread for queue {}", queue_id);
 
-        // Read a packet
-        let len = tun.read(&mut buffer).unwrap();
+            let mut buffer = vec![0u8; 1500];
+            loop {
+                // Indicate to the profiler that we are starting a new packet
+                profiling::finish_frame!();
+                profiling::scope!("packet");
 
-        // Translate it based on the Layer 3 protocol number
-        let translation_result: Result<Option<Vec<u8>>, PacketHandlingError> =
-            match get_layer_3_proto(&buffer[..len]) {
-                Some(4) => {
-                    let (source, dest) = get_ipv4_src_dst(&buffer[..len]);
-                    match addr_table.borrow().get_ipv6(&dest) {
-                        Some(new_destination) => translate_ipv4_to_ipv6(
-                            &buffer[..len],
-                            unsafe { embed_ipv4_addr_unchecked(source, config.translation_prefix) },
-                            new_destination,
-                        )
-                        .map(Some)
-                        .map_err(PacketHandlingError::from),
-                        None => {
-                            protomask_metrics::metric!(
-                                PACKET_COUNTER,
-                                PROTOCOL_IPV4,
-                                STATUS_DROPPED
-                            );
-                            Ok(None)
-                        }
-                    }
-                }
-                Some(6) => {
-                    let (source, dest) = get_ipv6_src_dst(&buffer[..len]);
-                    match addr_table.borrow_mut().get_or_create_ipv4(&source) {
-                        Ok(new_source) => {
-                            translate_ipv6_to_ipv4(&buffer[..len], new_source, unsafe {
-                                extract_ipv4_addr_unchecked(
-                                    dest,
-                                    config.translation_prefix.prefix_len(),
+                // Read a packet
+                let len = tun.fd(queue_id).unwrap().read(&mut buffer).unwrap();
+
+                // Translate it based on the Layer 3 protocol number
+                let translation_result: Result<Option<Vec<u8>>, PacketHandlingError> =
+                    match get_layer_3_proto(&buffer[..len]) {
+                        Some(4) => {
+                            let (source, dest) = get_ipv4_src_dst(&buffer[..len]);
+                            match addr_table.lock().unwrap().get_ipv6(&dest) {
+                                Some(new_destination) => translate_ipv4_to_ipv6(
+                                    &buffer[..len],
+                                    unsafe {
+                                        embed_ipv4_addr_unchecked(source, config.translation_prefix)
+                                    },
+                                    new_destination,
                                 )
-                            })
-                            .map(Some)
-                            .map_err(PacketHandlingError::from)
+                                .map(Some)
+                                .map_err(PacketHandlingError::from),
+                                None => {
+                                    protomask_metrics::metric!(
+                                        PACKET_COUNTER,
+                                        PROTOCOL_IPV4,
+                                        STATUS_DROPPED
+                                    );
+                                    Ok(None)
+                                }
+                            }
                         }
-                        Err(error) => {
-                            log::error!("Error getting IPv4 address: {}", error);
-                            protomask_metrics::metric!(
-                                PACKET_COUNTER,
-                                PROTOCOL_IPV6,
-                                STATUS_DROPPED
-                            );
-                            Ok(None)
+                        Some(6) => {
+                            let (source, dest) = get_ipv6_src_dst(&buffer[..len]);
+                            match addr_table.lock().unwrap().get_or_create_ipv4(&source) {
+                                Ok(new_source) => {
+                                    translate_ipv6_to_ipv4(&buffer[..len], new_source, unsafe {
+                                        extract_ipv4_addr_unchecked(
+                                            dest,
+                                            config.translation_prefix.prefix_len(),
+                                        )
+                                    })
+                                    .map(Some)
+                                    .map_err(PacketHandlingError::from)
+                                }
+                                Err(error) => {
+                                    log::error!("Error getting IPv4 address: {}", error);
+                                    protomask_metrics::metric!(
+                                        PACKET_COUNTER,
+                                        PROTOCOL_IPV6,
+                                        STATUS_DROPPED
+                                    );
+                                    Ok(None)
+                                }
+                            }
                         }
-                    }
-                }
-                Some(proto) => {
-                    log::warn!("Unknown Layer 3 protocol: {}", proto);
-                    continue;
-                }
-                None => {
-                    continue;
-                }
-            };
+                        Some(proto) => {
+                            log::warn!("Unknown Layer 3 protocol: {}", proto);
+                            continue;
+                        }
+                        None => {
+                            continue;
+                        }
+                    };
 
-        // Handle any errors and write
-        if let Some(output) = handle_translation_error(translation_result) {
-            tun.write_all(&output).unwrap();
-        }
+                // Handle any errors and write
+                if let Some(output) = handle_translation_error(translation_result) {
+                    tun.fd(queue_id).unwrap().write_all(&output).unwrap();
+                }
+            }
+        }));
+    }
+    for worker in worker_threads {
+        worker.join().unwrap();
     }
 }

@@ -6,7 +6,9 @@ use std::{
 };
 
 use ioctl_gen::{ioc, iow};
-use libc::{__c_anonymous_ifr_ifru, ifreq, ioctl, IFF_NO_PI, IFF_TUN, IF_NAMESIZE};
+use libc::{
+    __c_anonymous_ifr_ifru, ifreq, ioctl, IFF_MULTI_QUEUE, IFF_NO_PI, IFF_TUN, IF_NAMESIZE,
+};
 
 /// Architecture / target environment specific definitions
 mod arch {
@@ -22,8 +24,8 @@ mod arch {
 
 /// A TUN device
 pub struct Tun {
-    /// Internal file descriptor for the TUN device
-    fd: File,
+    /// All internal file descriptors
+    fds: Vec<Box<File>>,
     /// Device name
     name: String,
 }
@@ -35,15 +37,23 @@ impl Tun {
     /// and may contain a `%d` format specifier to allow for multiple devices with the same name.
     #[allow(clippy::cast_possible_truncation)]
     #[allow(clippy::cast_lossless)]
-    pub fn new(dev: &str) -> Result<Self, std::io::Error> {
-        log::debug!("Creating new TUN device with requested name:{}", dev);
+    pub fn new(dev: &str, queues: usize) -> Result<Self, std::io::Error> {
+        log::debug!(
+            "Creating new TUN device with requested name: {} ({} queues)",
+            dev,
+            queues
+        );
 
-        // Get a file descriptor for `/dev/net/tun`
+        // Create all needed file descriptors for `/dev/net/tun`
         log::trace!("Opening /dev/net/tun");
-        let fd = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open("/dev/net/tun")?;
+        let mut fds = Vec::with_capacity(queues);
+        for _ in 0..queues {
+            let fd = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open("/dev/net/tun")?;
+            fds.push(Box::new(fd));
+        }
 
         // Copy the device name into a C string with padding
         // NOTE: No zero padding is needed because we pre-init the array to all 0s
@@ -57,25 +67,28 @@ impl Tun {
         let mut ifr = ifreq {
             ifr_name: dev_cstr,
             ifr_ifru: __c_anonymous_ifr_ifru {
-                ifru_flags: (IFF_TUN | IFF_NO_PI) as i16,
+                ifru_flags: (IFF_TUN | IFF_NO_PI | IFF_MULTI_QUEUE) as i16,
             },
         };
 
-        // Make an ioctl call to create the TUN device
-        log::trace!("Calling ioctl to create TUN device");
-        let err = unsafe {
-            ioctl(
-                fd.as_raw_fd(),
-                iow!('T', 202, size_of::<libc::c_int>()) as arch::IoctlRequestType,
-                &mut ifr,
-            )
-        };
-        log::trace!("ioctl returned: {}", err);
+        // Each FD needs to be configured separately
+        for fd in fds.iter_mut() {
+            // Make an ioctl call to create the TUN device
+            log::trace!("Calling ioctl to create TUN device");
+            let err = unsafe {
+                ioctl(
+                    fd.as_raw_fd(),
+                    iow!('T', 202, size_of::<libc::c_int>()) as arch::IoctlRequestType,
+                    &mut ifr,
+                )
+            };
+            log::trace!("ioctl returned: {}", err);
 
-        // Check for errors
-        if err < 0 {
-            log::error!("ioctl failed: {}", err);
-            return Err(std::io::Error::last_os_error());
+            // Check for errors
+            if err < 0 {
+                log::error!("ioctl failed: {}", err);
+                return Err(std::io::Error::last_os_error());
+            }
         }
 
         // Get the name of the device
@@ -88,7 +101,7 @@ impl Tun {
         log::debug!("Created TUN device: {}", name);
 
         // Build the TUN struct
-        Ok(Self { fd, name })
+        Ok(Self { fds, name })
     }
 
     /// Get the name of the TUN device
@@ -99,38 +112,14 @@ impl Tun {
 
     /// Get the underlying file descriptor
     #[must_use]
-    pub fn fd(&self) -> &File {
-        &self.fd
-    }
-}
-
-impl AsRawFd for Tun {
-    fn as_raw_fd(&self) -> RawFd {
-        self.fd.as_raw_fd()
-    }
-}
-
-impl IntoRawFd for Tun {
-    fn into_raw_fd(self) -> RawFd {
-        self.fd.into_raw_fd()
-    }
-}
-
-impl Read for Tun {
-    #[profiling::function]
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.fd.read(buf)
-    }
-}
-
-impl Write for Tun {
-    #[profiling::function]
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.fd.write(buf)
+    pub fn fd(&self, queue_id: usize) -> Option<&File> {
+        self.fds.get(queue_id).map(|fd| &**fd)
     }
 
-    #[profiling::function]
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.fd.flush()
+    /// Get mutable access to the underlying file descriptor
+    #[must_use]
+    pub fn fd_mut(&mut self, queue_id: usize) -> Option<&mut File> {
+        self.fds.get_mut(queue_id).map(|fd| &mut **fd)
     }
+
 }

@@ -82,4 +82,9 @@ pub struct Config {
         serialize_with = "crate::common::rfc6052::serialize_network_specific_prefix"
     )]
     pub embed_prefix: Ipv6Net,
+
+    /// Number of queues to create on the TUN device
+    #[clap(long, default_value = "1")]
+    #[serde(rename = "queues")]
+    pub num_queues: usize,
 }

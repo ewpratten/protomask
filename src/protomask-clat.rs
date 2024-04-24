@@ -16,6 +16,7 @@ use interproto::protocols::ip::{translate_ipv4_to_ipv6, translate_ipv6_to_ipv4};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use rfc6052::{embed_ipv4_addr_unchecked, extract_ipv4_addr_unchecked};
 use std::io::{Read, Write};
+use std::sync::Arc;
 
 mod args;
 mod common;
@@ -39,7 +40,7 @@ pub async fn main() {
     let _server = start_puffin_server(&args.profiler_args);
 
     // Bring up a TUN interface
-    let mut tun = Tun::new(&args.interface).unwrap();
+    let tun = Arc::new(Tun::new(&args.interface, config.num_queues).unwrap());
 
     // Get the interface index
     let rt_handle = rtnl::new_handle().unwrap();
@@ -87,54 +88,70 @@ pub async fn main() {
 
     // Translate all incoming packets
     log::info!("Translating packets on {}", tun.name());
-    let mut buffer = vec![0u8; 1500];
-    loop {
-        // Indicate to the profiler that we are starting a new packet
-        profiling::finish_frame!();
-        profiling::scope!("packet");
+    let mut worker_threads = Vec::new();
+    for queue_id in 0..config.num_queues {
+        let tun = Arc::clone(&tun);
+        worker_threads.push(std::thread::spawn(move || {
+            log::debug!("Starting worker thread for queue {}", queue_id);
+            let mut buffer = vec![0u8; 1500];
+            loop {
+                // Indicate to the profiler that we are starting a new packet
+                profiling::finish_frame!();
+                profiling::scope!("packet");
 
-        // Read a packet
-        let len = tun.read(&mut buffer).unwrap();
+                // Read a packet
+                let len = tun.fd(queue_id).unwrap().read(&mut buffer).unwrap();
 
-        // Translate it based on the Layer 3 protocol number
-        let translation_result: Result<Option<Vec<u8>>, PacketHandlingError> =
-            match get_layer_3_proto(&buffer[..len]) {
-                Some(4) => {
-                    let (source, dest) = get_ipv4_src_dst(&buffer[..len]);
-                    translate_ipv4_to_ipv6(
-                        &buffer[..len],
-                        unsafe { embed_ipv4_addr_unchecked(source, config.embed_prefix) },
-                        unsafe { embed_ipv4_addr_unchecked(dest, config.embed_prefix) },
-                    )
-                    .map(Some)
-                    .map_err(PacketHandlingError::from)
-                }
-                Some(6) => {
-                    let (source, dest) = get_ipv6_src_dst(&buffer[..len]);
-                    translate_ipv6_to_ipv4(
-                        &buffer[..len],
-                        unsafe {
-                            extract_ipv4_addr_unchecked(source, config.embed_prefix.prefix_len())
-                        },
-                        unsafe {
-                            extract_ipv4_addr_unchecked(dest, config.embed_prefix.prefix_len())
-                        },
-                    )
-                    .map(Some)
-                    .map_err(PacketHandlingError::from)
-                }
-                Some(proto) => {
-                    log::warn!("Unknown Layer 3 protocol: {}", proto);
-                    continue;
-                }
-                None => {
-                    continue;
-                }
-            };
+                // Translate it based on the Layer 3 protocol number
+                let translation_result: Result<Option<Vec<u8>>, PacketHandlingError> =
+                    match get_layer_3_proto(&buffer[..len]) {
+                        Some(4) => {
+                            let (source, dest) = get_ipv4_src_dst(&buffer[..len]);
+                            translate_ipv4_to_ipv6(
+                                &buffer[..len],
+                                unsafe { embed_ipv4_addr_unchecked(source, config.embed_prefix) },
+                                unsafe { embed_ipv4_addr_unchecked(dest, config.embed_prefix) },
+                            )
+                            .map(Some)
+                            .map_err(PacketHandlingError::from)
+                        }
+                        Some(6) => {
+                            let (source, dest) = get_ipv6_src_dst(&buffer[..len]);
+                            translate_ipv6_to_ipv4(
+                                &buffer[..len],
+                                unsafe {
+                                    extract_ipv4_addr_unchecked(
+                                        source,
+                                        config.embed_prefix.prefix_len(),
+                                    )
+                                },
+                                unsafe {
+                                    extract_ipv4_addr_unchecked(
+                                        dest,
+                                        config.embed_prefix.prefix_len(),
+                                    )
+                                },
+                            )
+                            .map(Some)
+                            .map_err(PacketHandlingError::from)
+                        }
+                        Some(proto) => {
+                            log::warn!("Unknown Layer 3 protocol: {}", proto);
+                            continue;
+                        }
+                        None => {
+                            continue;
+                        }
+                    };
 
-        // Handle any errors and write
-        if let Some(output) = handle_translation_error(translation_result) {
-            tun.write_all(&output).unwrap();
-        }
+                // Handle any errors and write
+                if let Some(output) = handle_translation_error(translation_result) {
+                    tun.fd(queue_id).unwrap().write_all(&output).unwrap();
+                }
+            }
+        }));
+    }
+    for worker in worker_threads {
+        worker.join().unwrap();
     }
 }

@@ -1,8 +1,7 @@
 use std::{
     fs::{File, OpenOptions},
-    io::{Read, Write},
     mem::size_of,
-    os::fd::{AsRawFd, IntoRawFd, RawFd},
+    os::fd::AsRawFd,
 };
 
 use ioctl_gen::{ioc, iow};
@@ -25,7 +24,7 @@ mod arch {
 /// A TUN device
 pub struct Tun {
     /// All internal file descriptors
-    fds: Vec<Box<File>>,
+    fds: Vec<File>,
     /// Device name
     name: String,
 }
@@ -52,7 +51,7 @@ impl Tun {
                 .read(true)
                 .write(true)
                 .open("/dev/net/tun")?;
-            fds.push(Box::new(fd));
+            fds.push(fd);
         }
 
         // Copy the device name into a C string with padding
@@ -72,7 +71,7 @@ impl Tun {
         };
 
         // Each FD needs to be configured separately
-        for fd in fds.iter_mut() {
+        for fd in &mut fds {
             // Make an ioctl call to create the TUN device
             log::trace!("Calling ioctl to create TUN device");
             let err = unsafe {
@@ -113,13 +112,12 @@ impl Tun {
     /// Get the underlying file descriptor
     #[must_use]
     pub fn fd(&self, queue_id: usize) -> Option<&File> {
-        self.fds.get(queue_id).map(|fd| &**fd)
+        self.fds.get(queue_id)
     }
 
     /// Get mutable access to the underlying file descriptor
     #[must_use]
     pub fn fd_mut(&mut self, queue_id: usize) -> Option<&mut File> {
-        self.fds.get_mut(queue_id).map(|fd| &mut **fd)
+        self.fds.get_mut(queue_id).map(|fd| &mut *fd)
     }
-
 }

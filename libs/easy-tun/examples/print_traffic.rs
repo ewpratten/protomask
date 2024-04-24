@@ -7,7 +7,7 @@ fn main() {
     env_logger::init();
 
     // Bring up a TUN interface
-    let mut tun = Tun::new("tun%d", 1).unwrap();
+    let tun = Tun::new("tun%d", 1).unwrap();
 
     // Loop and read from the interface
     let mut buffer = [0u8; 1500];

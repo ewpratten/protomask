@@ -85,8 +85,9 @@ impl Tun {
 
             // Check for errors
             if err < 0 {
-                log::error!("ioctl failed: {}", err);
-                return Err(std::io::Error::last_os_error());
+                let last_error = std::io::Error::last_os_error();
+                log::error!("ioctl failed: {:?}", last_error);
+                return Err(last_error);
             }
         }
 
